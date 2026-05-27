@@ -5,7 +5,8 @@
 - Added character & key metrics such as entropy rating and movable character count;
 - Added Live Encryption option to automatically update the output in real time;
 - Added saving to settings to localStorage so that user preferences persist across sessions;
-- Saving doesn't work so I might create a Github repo for this.
+- Removed key strength meter because it wasn't good enough;
+- Saving doesn't work so I might create a Github repo for this. (future me talking—I can't believe I actually did it!)
 
 ## v1.8:
 - Updated the index-based conditionals to be more intuitive;
