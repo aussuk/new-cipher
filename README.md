@@ -2,6 +2,8 @@
 
 A browser-based custom cipher encryptor with reversible character-swapping encryption, advanced key logic, and experimental key generation.
 
+This cipher is NOT secure compared to others as the original input can be found with trial and error, due to characters never being changed, just arranged in another way, so do not use it to keep valuable information.
+
 ## Features
 
 - Encrypt text using custom keys
@@ -171,7 +173,7 @@ into the input box.
 Clone:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/new-cipher.git
+git clone https://github.com/aussuk/new-cipher.git
 ```
 
 Open:
@@ -209,4 +211,6 @@ v1.9
 
 ---
 
-Made for fun, experimentation, and increasingly complicated cipher chaos.
+Created this cipher in Biology class while I wasn't paying attention... hope this inspires you not to pay attention in class!
+
+Have fun and please don't forget give me credits!
