@@ -1,12 +1,16 @@
 # Changelog
-
+## v1.10:
+- Made the saving system work (just needed to remove one line :P);
+- Fixed a bug which prevented index conditionals from working correctly;
+- Added achievements for using certain features and finding the secret mini-game, with a toast notification system to celebrate unlocks.
+- 
 ## v1.9:
 - Added a key strength meter that evaluates the complexity of the key based on various factors (length, character variety, use of conditionals, etc.);
 - Added character & key metrics such as entropy rating and movable character count;
 - Added Live Encryption option to automatically update the output in real time;
 - Added saving to settings to localStorage so that user preferences persist across sessions;
 - Removed key strength meter because it wasn't good enough;
-- Saving doesn't work so I might create a Github repo for this. (future me talking—I can't believe I actually did it!)
+- Saving doesn't work so I might create a Github repo for this. (future me talking—I can't believe I actually did it!).
 
 ## v1.8:
 - Updated the index-based conditionals to be more intuitive;
