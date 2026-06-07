@@ -229,6 +229,48 @@
     .mobile-snake-controls {
       display: none !important;
     }
+    /* Achievements Pop-up Toast */
+    .achievement-toast {
+      position: fixed;
+      top: -100px; /* Start hidden off-screen */
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+      color: #fff;
+      padding: 14px 24px;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3), 0 0 12px rgba(214, 158, 46, 0.4);
+      border: 2px solid #d69e2e; /* Gold border */
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .achievement-toast.show {
+      top: 20px; /* Glides down into view */
+    }
+    .achievement-toast .icon {
+      font-size: 24px;
+      animation: trophy-bounce 1s infinite alternate;
+    }
+    .achievement-toast .text-content h4 {
+      margin: 0;
+      color: #ecc94b; /* Bright Gold */
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .achievement-toast .text-content p {
+      margin: 2px 0 0 0;
+      font-size: 13px;
+      color: #e2e8f0;
+    }
+    @keyframes trophy-bounce {
+      from { transform: translateY(0); }
+      to { transform: translateY(-4px); }
+    }
   </style>
 </head>
 <body>
@@ -315,7 +357,7 @@
     }
 
     // evaluate a condition object against a character and optional index (1-based position among movable chars)
-    function evaluateCondition(cond, ch, idx) {
+    function evaluateSingleCondition(cond, ch, idx) {
       if (!cond) return true;
 
       // index-based conditions (kind === 'index')
@@ -361,6 +403,15 @@
           }
         }
         return cond.negate ? true : false;
+      }
+      return true;
+    }
+
+    function evaluateCondition(cond, ch, idx) {
+      if (!cond) return true;
+      const conditions = Array.isArray(cond) ? cond : [cond];
+      for (const condition of conditions) {
+        if (!evaluateSingleCondition(condition, ch, idx)) return false;
       }
       return true;
     }
@@ -428,12 +479,12 @@
 
       const numbers = [];
       const ops = [];
-      let pendingCond = null;
+      const pendingConds = [];
 
       function pushShift(val) {
         numbers.push(val);
-        ops.push({ shift: val, cond: pendingCond });
-        pendingCond = null;
+        ops.push({ shift: val, cond: pendingConds.length ? pendingConds.slice() : null });
+        pendingConds.length = 0;
       }
 
       function condEquals(a, b) {
@@ -503,7 +554,7 @@
                 letters.add(it.toUpperCase());
               }
             }
-            pendingCond = { kind: 'equals', negate: neg, letters: letters.size ? letters : null, ranges: ranges.length ? ranges : null };
+            pendingConds.push({ kind: 'equals', negate: neg, letters: letters.size ? letters : null, ranges: ranges.length ? ranges : null });
             continue;
           }
 
@@ -516,12 +567,12 @@
               payload = payload.trim();
               if (/^[0-9]+-[0-9]+$/.test(payload)) {
                 const parts = payload.split('-').map(Number);
-                pendingCond = { kind: 'index', negate: neg, range: [Math.min(parts[0], parts[1]), Math.max(parts[0], parts[1])] };
+                pendingConds.push({ kind: 'index', negate: neg, range: [Math.min(parts[0], parts[1]), Math.max(parts[0], parts[1])] });
                 continue;
               }
               const values = payload.split(',').map(v => Number(v.trim())).filter(Number.isFinite);
               if (values.length > 0) {
-                pendingCond = { kind: 'index', negate: neg, indices: values };
+                pendingConds.push({ kind: 'index', negate: neg, indices: values });
                 continue;
               }
             }
@@ -530,27 +581,44 @@
           // vowel / consonant: ?V ?C (case-insensitive)
           if (/^[VCvc]$/.test(next)) {
             const kind = (next.toUpperCase() === 'V') ? 'vowel' : 'consonant';
-            pendingCond = { kind, negate: neg };
+            pendingConds.push({ kind, negate: neg });
             i++; // consumed next char
             continue;
           }
 
           // position/index-based conditions starting with 'i'
           if (next && next.toLowerCase() === 'i') {
-            let j = i + 1; // points at 'i'
-            let expr = '';
-            // allow i, digits, %, <, >, =, !, parentheses, comma, hyphen
-            while (j < key.length && /[0-9i%<>=!(),\-]/.test(key[j])) { expr += key[j++]; }
-            i = j - 1;
+            let j = i + 2; // points at the first char after 'i'
+            let expr = 'i';
 
             // direct parity shorthand: ie/io
-            const parityMatch = expr.match(/^i([eo])$/i);
-            if (parityMatch) {
-              pendingCond = {
-                kind: 'index',
-                negate: neg,
-                parity: parityMatch[1].toLowerCase() === 'e' ? 'even' : 'odd'
-              };
+            if (j < key.length && /^[eo]$/i.test(key[j])) {
+              expr += key[j++];
+              i = j - 1;
+
+              const parityMatch = expr.match(/^i([eo])$/i);
+              if (parityMatch) {
+                pendingConds.push({
+                  kind: 'index',
+                  negate: neg,
+                  parity: parityMatch[1].toLowerCase() === 'e' ? 'even' : 'odd'
+                });
+                continue;
+              }
+            } else if (j < key.length && key[j] === '(') {
+              expr += key[j++];
+              while (j < key.length && key[j] !== ')') {
+                expr += key[j++];
+              }
+              if (j < key.length && key[j] === ')') {
+                expr += key[j++];
+                i = j - 1;
+              } else {
+                pendingConds.length = 0;
+                continue;
+              }
+            } else {
+              pendingConds.length = 0;
               continue;
             }
 
@@ -560,43 +628,43 @@
               const payload = listRangeMatch[1].trim();
 
               if (/^%\d+$/.test(payload)) {
-                pendingCond = {
+                pendingConds.push({
                   kind: 'index',
                   negate: neg,
                   mod: Number(payload.slice(1)),
                   op: '==',
                   rhs: 0
-                };
+                });
                 continue;
               }
 
               const compMatch = payload.match(/^(>=|<=|>|<|==|=)([0-9]+)$/);
               if (compMatch) {
                 let op = compMatch[1] === '=' ? '==' : compMatch[1];
-                pendingCond = { kind: 'index', negate: neg, op: op, rhs: Number(compMatch[2]) };
+                pendingConds.push({ kind: 'index', negate: neg, op: op, rhs: Number(compMatch[2]) });
                 continue;
               }
 
               if (/^[0-9]+-[0-9]+$/.test(payload)) {
                 const parts = payload.split('-').map(Number);
-                pendingCond = { kind: 'index', negate: neg, range: [Math.min(parts[0], parts[1]), Math.max(parts[0], parts[1])] };
+                pendingConds.push({ kind: 'index', negate: neg, range: [Math.min(parts[0], parts[1]), Math.max(parts[0], parts[1])] });
                 continue;
               }
 
               const values = payload.split(',').map(v => Number(v.trim())).filter(Number.isFinite);
               if (values.length > 0) {
-                pendingCond = { kind: 'index', negate: neg, indices: values };
+                pendingConds.push({ kind: 'index', negate: neg, indices: values });
                 continue;
               }
             }
 
             // unrecognized or deprecated index expression -> ignore pending
-            pendingCond = null;
+            pendingConds.length = 0;
             continue;
           }
 
           // unknown pattern -> ignore pending
-          pendingCond = null;
+          pendingConds.length = 0;
           continue;
         }
 
@@ -759,6 +827,7 @@
     function doEncrypt() {
       const word = document.getElementById('wordInput').value;
       const key = document.getElementById('keyInput').value;
+      checkKeyAchievements(key);
       const secretSequence = '↑↑↓↓←→←→';
       if (isMobileDevice() && word.trim() === secretSequence && !key.trim()) {
         if (!snakeOverlayOpen) showSecretOverlay();
@@ -774,6 +843,7 @@
     function doDecrypt() {
       const word = document.getElementById('wordInput').value;
       const key = document.getElementById('keyInput').value;
+      checkKeyAchievements(key);
       const parsed = parseKeyDetailed(key);
       const result = decrypt(word, key);
       const rounds = parsed.repeat && parsed.repeat > 1 ? ` (${parsed.repeat} Rounds)` : '';
@@ -810,11 +880,26 @@
       liveEncrypt: false
     };
 
+    const ACHIEVEMENTS_KEY = 'new_cipher_achievements';
+
+    // Default achievement definitions
+    let achievements = {
+      cryptanalyst: { name: "The Cryptanalyst", desc: "Successfully reversed a custom key!", unlocked: false },
+      bigBrain: { name: "Big Brain Logic", desc: "Used a conditional flag (? or !) in your key!", unlocked: false },
+      infinity: { name: "To Infinity... and beyond!", desc: "Activated the infinite extender (-) flag!", unlocked: false },
+      snakeUnlocked: { name: "Sssssuccess", desc: "Discovered the hidden Snake mini-game!", unlocked: false },
+      snakeMaster: { name: "Snake Master", desc: "Scored 20 points in the mini-game!", unlocked: false },
+      totalChaos: {name: "Total Chaos", desc: "Encrypted a key with 100% Entropy!", unlocked: false },
+      doomedSociety: {name: "Doomed Society",desc: "Total brainrot.", unlocked: false},
+      touchSomeGrass: {name: "Touch Some Grass", desc: "Encrypted 100 times!", unlocked: false}
+    };
+
     function loadSettings() {
       try {
         const saved = window.localStorage.getItem(SETTINGS_KEY);
         if (!saved) return;
         const parsed = JSON.parse(saved);
+        
         if (typeof parsed.caseSensitiveReversion === 'boolean') {
           settings.caseSensitiveReversion = parsed.caseSensitiveReversion;
           document.getElementById('caseSensitiveReversion').checked = parsed.caseSensitiveReversion;
@@ -831,6 +916,78 @@
       } catch (err) {
         console.warn('Failed to load settings:', err);
       }
+    }
+
+    // Load achievements from localStorage on boot
+    function loadAchievements() {
+      try {
+        const saved = localStorage.getItem(ACHIEVEMENTS_KEY);
+        if (!saved) return;
+        const parsed = JSON.parse(saved);
+        // Sync values into our operational object
+        for (let key in parsed) {
+          if (achievements[key]) {
+            achievements[key].unlocked = parsed[key].unlocked;
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load achievements:', err);
+      }
+    }
+
+    function checkKeyAchievements(rawKey) {
+      const parsed = parseKeyDetailed(rawKey || '');
+      if (/[?!]/.test(rawKey || '')) {
+        unlockAchievement('bigBrain');
+      }
+      if (parsed.extender) {
+        unlockAchievement('infinity');
+      }
+      const clean = (rawKey || '').toLowerCase().trim();
+      if (clean === '67' || clean === 'sixseven') {
+        unlockAchievement('doomedSociety');
+      }
+    }
+
+    // Trigger an unlock check
+    function unlockAchievement(id) {
+      if (achievements[id] && !achievements[id].unlocked) {
+        achievements[id].unlocked = true;
+        
+        // Save state immediately
+        localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(achievements));
+        
+        // Throw the top screen animation popup
+        showAchievementToast(achievements[id].name, achievements[id].desc);
+      }
+    }
+
+    // Creates and animates the toast container at the top of the viewport
+    function showAchievementToast(title, description) {
+      // Remove an old toast if one is still lingering
+      const oldToast = document.querySelector('.achievement-toast');
+      if (oldToast) oldToast.remove();
+
+      // Build the structure
+      const toast = document.createElement('div');
+      toast.className = 'achievement-toast';
+      toast.innerHTML = `
+        <div class="icon">🏆</div>
+        <div class="text-content">
+          <h4>Achievement Unlocked!</h4>
+          <p><strong>${title}</strong> - ${description}</p>
+        </div>
+      `;
+      document.body.appendChild(toast);
+
+      // Trigger transition via macro-task delay
+      setTimeout(() => toast.classList.add('show'), 50);
+
+      // Slide back up and delete after 4 seconds
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 600);
+      }, 4000);
     }
 
     function saveSettings() {
@@ -915,6 +1072,7 @@
     }
 
     function showSecretOverlay() {
+      unlockAchievement('snakeUnlocked');
       const overlay = document.getElementById('secretOverlay');
       const message = document.getElementById('secretMessage');
       overlay.classList.remove('hidden');
@@ -1016,6 +1174,9 @@
     }
 
     function tickSnakeGame() {
+      if (snakeScore === 20) {
+        unlockAchievement('snakeMaster');
+      }
       if (!snakeRunning) return;
       snakeDirection = snakeNextDirection;
       const head = { ...snakeBody[0] };
@@ -1166,7 +1327,6 @@
     document.getElementById('settingsCloseBtn').addEventListener('click', closeSettingsPanel);
     document.getElementById('caseSensitiveReversion').addEventListener('change', syncSettingsFromUi);
     document.querySelectorAll('input[name="reverseMode"]').forEach(input => input.addEventListener('change', syncSettingsFromUi));
-    syncSettingsFromUi();
 
     // Enter behavior
     document.getElementById('keyInput').addEventListener('keydown', function(e) {
@@ -1249,6 +1409,7 @@
       const k = generateRandomKey(2, 15);
       const keyInput = document.getElementById('keyInput');
       keyInput.value = k;
+      checkKeyAchievements(k);
       keyInput.focus();
       const prev = keyInput.style.background;
       keyInput.style.background = '#eaffea';
@@ -1281,12 +1442,26 @@
     }
 
     document.getElementById('copyBtn').addEventListener('click', copyOutput);
+    
+    // Listeners that update settings and save when user changes them
     document.getElementById('liveEncrypt').addEventListener('change', syncSettingsFromUi);
+    document.getElementById('caseSensitiveReversion').addEventListener('change', syncSettingsFromUi);
+    document.querySelectorAll('input[name="reverseMode"]').forEach(input => {
+      input.addEventListener('change', syncSettingsFromUi);
+    });
     document.getElementById('wordInput').addEventListener('input', handleLiveInputUpdate);
-    document.getElementById('keyInput').addEventListener('input', handleLiveInputUpdate);
+    document.getElementById('keyInput').addEventListener('input', function() {
+      checkKeyAchievements(this.value);
+      handleLiveInputUpdate();
+    });
 
+    // Boot Up Sequence: Load from storage first, update variables, then draw metrics safely
+    loadAchievements();
     loadSettings();
-    syncSettingsFromUi();
+    updateMetrics();
+    if (settings.liveEncrypt) {
+      doEncrypt();
+    }
 
     function normalizeForReverse(text) {
       return settings.caseSensitiveReversion ? text : String(text).toLowerCase();
@@ -1427,6 +1602,7 @@
       }
 
       if (foundKey) {
+        unlockAchievement('cryptanalyst');
         const elapsedMs = performance.now() - startTime;
         const elapsedSec = elapsedMs / 1000;
         let elapsed;
@@ -1449,66 +1625,3 @@
   </script>
 </body>
 </html>
-
-<!--
-Update Log:
-
-1.0:
-- Encryption logic implemented;
-- Key that supports both numbers and letters.
-
-1.1:
-- Improved UI with responsive design;
-- "Enter" key triggers encryption automatically.
-
-1.2:
-- Added decryption functionality.
-
-1.3:
-- Copy to clipboard feature for output text;
-- Added "Random Key" generator button (5 letter/number key);
-- Versatile multi-line text box (use Ctrl/Cmd+Enter to encrypt when editing multiple lines).
-
-1.4:
-- Tweaked the random key generator to vary the number of characters (not just 5);
-- Added options to encryption/decryption to ignore spaces (_), punctuation (:), or paragraphs (p).
-
-1.5:
-- Added reverse button to create key based on input-output text;
-- Changed monospacefont to a more modern sans-serif;
-- Changed auto-encrypt shortcut "Ctrl/Cmd+Enter" to "Shift+Enter";
-- Added simple button animation on click.
-
-1.6:
-- Made shifting possible an indeterminate amount of times using brackets (n);
-- Made Reverse method more efficient;
-- Added more Key customization options: Rounds (#n), Positive Conditionals (?) and Negative Conditionals (!);
-- Implemented a help panel with usage instructions and examples;
-- Delayed the addition of the help panel due to being too complex;
-- Tweaked Random Key generation logic to include new features.
-
-1.7:
-- Came back like a chad ready to add more stuff;
-- Updated the Update Log (I know, crazy right?);
-- Changed the ignore-paragraph flag symbol from 'p' to '¶';
-- Added a easter egg if the user presses a specific combination of the arrow keys;
-- Added support of snake game to mobile;
-- Removed Herobrine.
-
-1.8:
-- Updated the index-based conditionals to be more intuitive;
-- Added extender customization option to repeat the last shift indefinitely;
-- Updated the reverse button's to support extenders and letters;
-- Updated the reverse outputs to show the time taken to find the key;
-- Realized that this AI's aura is so high when I said "ok ty" he responded with "You're welcome." 🥶🥶;
-- Changed way to enter sectret mode in mobile;
-- Changed support for mobile in the easter egg because it wasnt working.
-
-1.9:
-- Added a key strength meter that evaluates the complexity of the key based on various factors (length, character variety, use of conditionals, etc.);
-- Added character & key metrics such as entropy rating and movable character count;
-- Added Live Encryption option to automatically update the output in real time;
-- Added saving to settings to localStorage so that user preferences persist across sessions;
-- Removed strength meter due to it getting totally removed by the AI so I got frustrated;
-- Saving doesn't work so I might create a Github repository for this.
--->
