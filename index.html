@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="icon" type="image/png" href="Cipher_Logo.png">
+  <link id="favicon" rel="icon" type="image/png" href="logo2.png">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Custom Cipher Encryptor</title>
@@ -275,7 +275,7 @@
 </head>
 <body>
   <div class="container">
-    <h2>Custom Cipher Encryptor</h2>
+    <h2 id="mainTitle">Custom Cipher Encryptor</h2>
 
     <label for="wordInput">Text to Encrypt / Decrypt:</label>
     <textarea id="wordInput"></textarea>
@@ -336,16 +336,62 @@
       <div style="font-weight:600; margin-bottom: 8px;">Reverse mode</div>
       <label style="display:block; margin-bottom: 12px;">
         <input type="radio" name="reverseMode" value="deep" checked> Deep Search
-        <div style="color:#666; margin-left: 22px; font-size:0.95em;">For small amounts of text. Slower, but generates a simple key.</div>
+        <div style="color:#666; margin-left: 22px; font-size:0.95em;">Brute-force search for the reverse key.</div>
       </label>
       <label style="display:block; margin-bottom: 12px;">
-        <input type="radio" name="reverseMode" value="quick"> Direct Mapping
-        <div style="color:#666; margin-left: 22px; font-size:0.95em;">Very fast, but generates a key depending on the input text.</div>
+        <input type="radio" name="reverseMode" value="quick"> Quick &amp; Big
+        <div style="color:#666; margin-left: 22px; font-size:0.95em;">Calculate the reverse key directly from the source and target text.</div>
       </label>
     </div>
   </div>
 
   <script>
+    document.addEventListener("DOMContentLoaded", () => {
+    
+    // --- 1. FAVICON LOTTERY (1 in 100 Chance) ---
+    const favicon = document.getElementById("favicon");
+    if (favicon) {
+      const faviconRoll = Math.floor(Math.random() * 100); // 0 to 99
+      
+      if (faviconRoll === 0) {
+        // 1% chance to drop the alternate version
+        favicon.href = "logo1.png";
+      } else if (faviconRoll === 1) {
+        // 1% chance to drop the alternate version
+        favicon.href = "logo3.png";
+      } else {
+        // 99% chance for your main standard version
+        favicon.href = "logo2.png"; 
+      }
+    }
+
+    // --- 2. TITLE SPLASH LOTTERY (1 in 1000 Chance) ---
+    const titleRoll = Math.floor(Math.random() * 1000); // 0 to 999
+    
+    if (titleRoll === 0) {
+      // Pick randomly between your two specific encrypted string variations
+      const secretTitles = [
+        "uemocstyppCr hErrti onC", 
+        "uroCirCch En tmrtsppeyo"
+      ];
+      const chosenTitle = secretTitles[Math.floor(Math.random() * secretTitles.length)];
+      
+      // Update the visual H2 header on the web page
+      const headerElement = document.getElementById("mainTitle") || document.querySelector("h2");
+      if (headerElement) {
+        headerElement.textContent = chosenTitle;
+      }
+      
+      // Update the text display on the actual browser tab
+      document.title = chosenTitle;
+
+      // Trigger your achievement pop-up toast notification!
+      if (typeof showToast === "function") {
+        showToast("🎰 Elite Luck: You hit the 1-in-1000 encrypted title Easter egg!");
+      }
+    }
+    
+  });
     // helper: is letter
     function isLetter(ch) {
       return /^[A-Za-z]$/.test(ch);
