@@ -1,6 +1,4 @@
 # New Cipher
-## (I don't have a namefor it)
-
 A browser-based custom cipher encryptor with reversible character-swapping encryption, advanced key logic, and experimental key generation.
 
 This cipher is NOT secure compared to others as the original input can be found with trial and error, due to characters never being changed, just arranged in another way, so do not use it to keep valuable information.
@@ -214,4 +212,6 @@ v1.9
 
 Created this cipher in Biology class while I wasn't paying attention... hope this inspires you not to pay attention in class!
 
-Have fun and please don't forget give me credits!
+I don't have a name for it so if you have a suggestion please notify me
+
+Credit isn't mandatory but it's really appreciated! :D
