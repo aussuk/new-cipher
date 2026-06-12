@@ -1,4 +1,5 @@
 # New Cipher
+## (I don't have a namefor it)
 
 A browser-based custom cipher encryptor with reversible character-swapping encryption, advanced key logic, and experimental key generation.
 
