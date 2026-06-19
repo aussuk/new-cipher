@@ -3,7 +3,12 @@
 - Made the saving system work (just needed to remove one line :P);
 - Fixed a bug which prevented index conditionals from working correctly;
 - Added achievements for using certain features and finding the secret mini-game, with a toast notification system to celebrate unlocks.
-- 
+- Added a way to save specific keys using presets that are saved with @;
+- Commands can be used in the key box to delete, save, load and list;
+- Added even MORE achievements;
+- Statistics panel is now toggleable in the settings;
+- Added a secret developer mode using a certain combination of keys to unlock very serious information.
+  
 ## v1.9:
 - Added a key strength meter that evaluates the complexity of the key based on various factors (length, character variety, use of conditionals, etc.);
 - Added character & key metrics such as entropy rating and movable character count;
