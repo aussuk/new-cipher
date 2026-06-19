@@ -205,7 +205,7 @@ Possible future additions:
 Current version:
 
 ```text
-v1.9
+v1.10
 ```
 
 ---
