@@ -283,10 +283,20 @@
 
     <label for="keyInput">Key (numbers or letters)</label>
     <input type="text" id="keyInput">
+    <div class="note">Type /help for commands like /save presetname key, /load presetname, /delete preset presetname.</div>
+    <div id="presetControls" style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+      <button id="savePresetBtn" class="ghost">Save Preset</button>
+      <button id="loadPresetBtn" class="ghost">Load Preset</button>
+    </div>
+    <div id="presetPicker" style="display:none; margin-top:8px; padding:10px; border:1px solid #e2e8f0; background:#f9fafb; border-radius:8px;">
+      <div style="font-size:0.9em; font-weight:700; margin-bottom:6px;">Presets</div>
+      <div id="presetButtons" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+    </div>
     <div id="statusBar" class="statusBar">
       <div id="charMetrics">Chars: 0 | Movable: 0</div>
       <div id="entropyRating">Entropy: N/A</div>
     </div>
+    <div id="statsPanel" style="display:none; margin-top:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px;"></div>
 
     <div class="row">
       <button id="encryptBtn">Encrypt</button>
@@ -294,6 +304,7 @@
       <button id="reverseBtn" class="ghost">Reverse</button>
       <button id="randomKeyBtn" class="ghost">Random Key</button>
       <button id="copyBtn" class="ghost">Copy Output</button>
+      <button id="achievementsBtn" class="ghost">Achievements</button>
       <button id="settingsBtn" class="ghost">Settings</button>
     </div>
 
@@ -333,6 +344,10 @@
         <input type="checkbox" id="liveEncrypt">
         Live Encrypt
       </label>
+      <label style="display:flex; align-items:center; gap:10px; margin-bottom: 14px;">
+        <input type="checkbox" id="enableStatsPanel">
+        Show statistics panel
+      </label>
       <div style="font-weight:600; margin-bottom: 8px;">Reverse mode</div>
       <label style="display:block; margin-bottom: 12px;">
         <input type="radio" name="reverseMode" value="deep" checked> Deep Search
@@ -342,6 +357,26 @@
         <input type="radio" name="reverseMode" value="quick"> Quick &amp; Big
         <div style="color:#666; margin-left: 22px; font-size:0.95em;">Calculate the reverse key directly from the source and target text.</div>
       </label>
+    </div>
+  </div>
+
+  <div id="achievementsPanel" class="secret-overlay hidden">
+    <div class="secret-card" style="max-width: 560px;">
+      <h3>Achievements</h3>
+      <div id="achievementList" style="display:grid; gap:10px; text-align:left; max-height:60vh; overflow:auto;"></div>
+      <div style="margin-top:18px;">
+        <button id="achievementsCloseBtn" class="secret-btn secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="developerPanel" class="secret-overlay hidden">
+    <div class="secret-card" style="max-width: 520px; background:#151d2d; color:#eef5ff;">
+      <h3 style="color:#f7c948;">Developer Mode</h3>
+      <div id="developerStats" style="display:grid; gap:10px; text-align:left;"></div>
+      <div style="margin-top:18px;">
+        <button id="developerCloseBtn" class="secret-btn secondary">Close</button>
+      </div>
     </div>
   </div>
 
@@ -883,7 +918,15 @@
       const result = encrypt(word, key);
       const rounds = parsed.repeat && parsed.repeat > 1 ? ` (${parsed.repeat} Rounds)` : '';
       document.getElementById('output').textContent = result ? `Encrypted${rounds}: ${result}` : '';
+      encryptCount += 1;
+      localStorage.setItem(ENCRYPT_COUNT_KEY, String(encryptCount));
+      if (encryptCount >= 100) {
+        unlockAchievement('touchSomeGrass');
+      }
       updateMetrics();
+      if (document.getElementById('entropyRating').textContent.includes('100%')) {
+        unlockAchievement('totalChaos');
+      }
     }
 
     function doDecrypt() {
@@ -920,13 +963,20 @@
     let snakeGestureSetup = false;
 
     const SETTINGS_KEY = 'newCipherSettingsV1';
+    const PRESETS_KEY = 'newCipherPresetsV1';
+    const ENCRYPT_COUNT_KEY = 'new_cipher_encrypt_count';
+
     const settings = {
       caseSensitiveReversion: true,
       reverseMode: 'deep',
-      liveEncrypt: false
+      liveEncrypt: false,
+      enableStatsPanel: false
     };
 
     const ACHIEVEMENTS_KEY = 'new_cipher_achievements';
+
+    let presets = {};
+    let encryptCount = 0;
 
     // Default achievement definitions
     let achievements = {
@@ -935,9 +985,13 @@
       infinity: { name: "To Infinity... and beyond!", desc: "Activated the infinite extender (-) flag!", unlocked: false },
       snakeUnlocked: { name: "Sssssuccess", desc: "Discovered the hidden Snake mini-game!", unlocked: false },
       snakeMaster: { name: "Snake Master", desc: "Scored 20 points in the mini-game!", unlocked: false },
+      presetPioneer: { name: "Preset Pioneer", desc: "Saved your first key preset!", unlocked: false },
+      randomRitual: { name: "Lucky Roll", desc: "Generated a random key!", unlocked: false },
+      reverseWizard: { name: "Reverse Wizard", desc: "Resolved a reverse search!", unlocked: false },
       totalChaos: {name: "Total Chaos", desc: "Encrypted a key with 100% Entropy!", unlocked: false },
       doomedSociety: {name: "Doomed Society",desc: "Total brainrot.", unlocked: false},
-      touchSomeGrass: {name: "Touch Some Grass", desc: "Encrypted 100 times!", unlocked: false}
+      touchSomeGrass: {name: "Touch Some Grass", desc: "Encrypted 100 times!", unlocked: false},
+      devMode: {name: "Developer Mode", desc: "Opened the secret developer screen!", unlocked: false}
     };
 
     function loadSettings() {
@@ -954,6 +1008,10 @@
           settings.liveEncrypt = parsed.liveEncrypt;
           document.getElementById('liveEncrypt').checked = parsed.liveEncrypt;
         }
+        if (typeof parsed.enableStatsPanel === 'boolean') {
+          settings.enableStatsPanel = parsed.enableStatsPanel;
+          document.getElementById('enableStatsPanel').checked = parsed.enableStatsPanel;
+        }
         if (parsed.reverseMode === 'deep' || parsed.reverseMode === 'quick') {
           settings.reverseMode = parsed.reverseMode;
           const selected = document.querySelector(`input[name="reverseMode"][value="${parsed.reverseMode}"]`);
@@ -961,6 +1019,31 @@
         }
       } catch (err) {
         console.warn('Failed to load settings:', err);
+      }
+    }
+
+    function loadPresets() {
+      try {
+        const saved = localStorage.getItem(PRESETS_KEY);
+        if (!saved) return;
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          presets = parsed;
+        }
+      } catch (err) {
+        console.warn('Failed to load presets:', err);
+      }
+      updatePresetPicker();
+    }
+
+    function loadEncryptCount() {
+      try {
+        const saved = Number(localStorage.getItem(ENCRYPT_COUNT_KEY));
+        if (Number.isFinite(saved) && saved >= 0) {
+          encryptCount = saved;
+        }
+      } catch (err) {
+        console.warn('Failed to load encrypt count:', err);
       }
     }
 
@@ -1041,7 +1124,8 @@
         const payload = {
           caseSensitiveReversion: settings.caseSensitiveReversion,
           reverseMode: settings.reverseMode,
-          liveEncrypt: settings.liveEncrypt
+          liveEncrypt: settings.liveEncrypt,
+          enableStatsPanel: settings.enableStatsPanel
         };
         window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(payload));
       } catch (err) {
@@ -1049,9 +1133,254 @@
       }
     }
 
+    function getPresetMap() {
+      return presets && typeof presets === 'object' ? presets : {};
+    }
+
+    function savePresetMap(map) {
+      presets = map;
+      localStorage.setItem(PRESETS_KEY, JSON.stringify(map));
+      updatePresetPicker();
+    }
+
+    function saveCurrentPreset() {
+      const key = document.getElementById('keyInput').value.trim();
+      if (!key) {
+        alert('Type a key before saving a preset.');
+        return;
+      }
+      const presetName = prompt('Name this preset:');
+      if (!presetName) return;
+      const safeName = presetName.trim().replace(/^@/, '').replace(/\s+/g, '_');
+      if (!safeName) return;
+      const map = getPresetMap();
+      map[safeName] = key;
+      savePresetMap(map);
+      unlockAchievement('presetPioneer');
+    }
+
+    function normalizePresetName(raw) {
+      const text = String(raw || '').trim().replace(/^@/, '');
+      return text.replace(/\s+/g, '_');
+    }
+
+    function runPresetCommand(raw) {
+      const text = raw.trim();
+      if (!text.startsWith('/')) return false;
+
+      const parts = text.split(/\s+/);
+      const command = parts[0].toLowerCase();
+      const arg = parts.slice(1).join(' ').trim();
+      const map = getPresetMap();
+
+      if (command === '/help' || command === '/commands') {
+        document.getElementById('output').textContent = 'Commands: /save presetname key; /load presetname; /delete preset presetname; /list';
+        return true;
+      }
+
+      if (command === '/list') {
+        const names = Object.keys(map).sort();
+        document.getElementById('output').textContent = names.length
+          ? `Presets: ${names.map(n => '@' + n).join(', ')}`
+          : 'No presets saved yet.';
+        return true;
+      }
+
+      if (command === '/save') {
+        const parts = text.split(/\s+/);
+        if (parts.length < 3) {
+          document.getElementById('output').textContent = 'Usage: /save presetname key';
+          return true;
+        }
+        const name = normalizePresetName(parts[1]);
+        const key = parts.slice(2).join(' ').trim();
+        if (!name || !key) {
+          document.getElementById('output').textContent = 'Usage: /save presetname key';
+          return true;
+        }
+        map[name] = key;
+        savePresetMap(map);
+        unlockAchievement('presetPioneer');
+        document.getElementById('keyInput').value = '';
+        document.getElementById('output').textContent = `Preset saved as @${name}`;
+        return true;
+      }
+
+      if (command === '/load' || command === '/use') {
+        const name = normalizePresetName(arg);
+        if (!name) {
+          document.getElementById('output').textContent = 'Usage: /load presetname';
+          return true;
+        }
+        if (!map[name]) {
+          document.getElementById('output').textContent = `Preset @${name} not found.`;
+          return true;
+        }
+        document.getElementById('keyInput').value = map[name];
+        document.getElementById('output').textContent = `Loaded preset @${name}`;
+        return true;
+      }
+
+      if (command === '/delete' || command === '/remove') {
+        const deleteParts = text.split(/\s+/);
+        if (deleteParts.length < 3 || deleteParts[1].toLowerCase() !== 'preset') {
+          document.getElementById('output').textContent = 'Usage: /delete preset presetname';
+          return true;
+        }
+        const name = normalizePresetName(deleteParts[2]);
+        if (!name) {
+          document.getElementById('output').textContent = 'Usage: /delete preset presetname';
+          return true;
+        }
+        if (!map[name]) {
+          document.getElementById('output').textContent = `Preset @${name} not found.`;
+          return true;
+        }
+        delete map[name];
+        savePresetMap(map);
+        document.getElementById('keyInput').value = '';
+        document.getElementById('output').textContent = `Deleted preset @${name}`;
+        return true;
+      }
+
+      document.getElementById('output').textContent = 'Unknown command. Try /help.';
+      return true;
+    }
+
+    function updatePresetPicker() {
+      const picker = document.getElementById('presetPicker');
+      const buttons = document.getElementById('presetButtons');
+      if (!picker || !buttons) return;
+      const names = Object.keys(getPresetMap()).sort();
+      if (!names.length) {
+        picker.style.display = 'none';
+        return;
+      }
+      picker.style.display = 'block';
+      buttons.innerHTML = '';
+      names.forEach(name => {
+        const btn = document.createElement('button');
+        btn.className = 'ghost';
+        btn.textContent = `@${name}`;
+        btn.style.padding = '0.45rem 0.65rem';
+        btn.style.fontSize = '0.9rem';
+        btn.addEventListener('click', () => {
+          const keyInput = document.getElementById('keyInput');
+          keyInput.value = getPresetMap()[name];
+          checkKeyAchievements(keyInput.value);
+          handleLiveInputUpdate();
+        });
+        buttons.appendChild(btn);
+      });
+    }
+
+    function loadPresetByName(name) {
+      return getPresetMap()[name] || null;
+    }
+
+    function renderAchievements() {
+      const list = document.getElementById('achievementList');
+      if (!list) return;
+      list.innerHTML = '';
+      Object.entries(achievements).forEach(([id, meta]) => {
+        const row = document.createElement('div');
+        row.style.padding = '10px';
+        row.style.borderRadius = '8px';
+        row.style.background = meta.unlocked ? '#eefbf2' : '#f7f7f7';
+        row.style.border = meta.unlocked ? '1px solid #9ae6b4' : '1px solid #e2e8f0';
+        const title = document.createElement('div');
+        title.style.fontWeight = '700';
+        title.textContent = meta.unlocked ? `${meta.name}` : meta.name;
+        row.appendChild(title);
+        if (meta.unlocked) {
+          const desc = document.createElement('div');
+          desc.style.fontSize = '0.92rem';
+          desc.style.color = '#4a5568';
+          desc.textContent = meta.desc;
+          row.appendChild(desc);
+        }
+        list.appendChild(row);
+      });
+    }
+
+    function openAchievementsPanel() {
+      renderAchievements();
+      document.getElementById('achievementsPanel').classList.remove('hidden');
+    }
+
+    function closeAchievementsPanel() {
+      document.getElementById('achievementsPanel').classList.add('hidden');
+    }
+
+    function updateDeveloperStats() {
+      const word = document.getElementById('wordInput').value || '';
+      const key = document.getElementById('keyInput').value || '';
+      const parsed = parseKeyDetailed(key);
+      const movable = getMovableIndices(word, parsed.flags);
+      const movableCount = movable.length;
+      const outputText = getOutputText();
+      let changedCount = 0;
+      for (const idx of movable) {
+        if (outputText[idx] !== word[idx]) changedCount += 1;
+      }
+      const aura = movableCount ? Math.min(100, Math.round((changedCount / movableCount) * 100)) : 0;
+      const bananaIndex = (key.length + (parsed.ops.length || 0) + (movableCount || 0)) / Math.max(1, word.length || 1);
+      const weirdness = (key.includes('?') || key.includes('!') || key.includes('-') || key.includes('#'))
+        ? 'Extreme'
+        : (parsed.ops.length > 3 ? 'High' : 'Moderate');
+      const chaosPotential = aura >= 100 ? 'Maximum' : aura >= 70 ? 'High' : aura >= 35 ? 'Medium' : 'Low';
+      const stats = [
+        ['Cipher Aura', `${aura}%`],
+        ['Banana Index', bananaIndex.toFixed(2)],
+        ['Key Weirdness', weirdness],
+        ['Chaos Potential', chaosPotential],
+        ['Rounds', String(Math.max(1, parsed.repeat || 1))],
+        ['Preset Count', String(Object.keys(getPresetMap()).length)]
+      ];
+      const container = document.getElementById('developerStats');
+      if (!container) return;
+      container.innerHTML = '';
+      stats.forEach(([label, value]) => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justifyContent = 'space-between';
+        row.style.gap = '12px';
+        row.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
+        container.appendChild(row);
+      });
+    }
+
+    function openDeveloperPanel() {
+      unlockAchievement('devMode');
+      updateDeveloperStats();
+      document.getElementById('developerPanel').classList.remove('hidden');
+    }
+
+    function closeDeveloperPanel() {
+      document.getElementById('developerPanel').classList.add('hidden');
+    }
+
     function getOutputText() {
       const out = document.getElementById('output').textContent || '';
       return out.replace(/^(Encrypted|Decrypted)(?:\s*\([^)]*\))?:\s*/, '');
+    }
+
+    function updateStatsPanel(stats) {
+      const panel = document.getElementById('statsPanel');
+      if (!panel) return;
+      panel.style.display = settings.enableStatsPanel ? 'block' : 'none';
+      if (!settings.enableStatsPanel) return;
+      panel.innerHTML = `
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;">
+          <div><strong>Input:</strong> ${stats.inputLength}</div>
+          <div><strong>Output:</strong> ${stats.outputLength}</div>
+          <div><strong>Movable:</strong> ${stats.movableCount}</div>
+          <div><strong>Changed:</strong> ${stats.changedCount}</div>
+          <div><strong>Unchanged:</strong> ${stats.unchangedCount}</div>
+          <div><strong>Avg Shift:</strong> ${stats.avgShift}</div>
+          <div><strong>Rounds:</strong> ${stats.rounds}</div>
+          <div><strong>Entropy:</strong> ${stats.entropyLabel}</div>
+        </div>`;
     }
 
     function updateMetrics() {
@@ -1062,23 +1391,39 @@
       const movable = getMovableIndices(word, parsed.flags);
       const total = word.length;
       const movableCount = movable.length;
-      document.getElementById('charMetrics').textContent = `Chars: ${total} | Movable: ${movableCount}`;
-
-      let entropyLabel = 'Entropy: N/A';
-      if (movableCount > 0) {
-        if (outputText) {
-          let changed = 0;
-          for (const idx of movable) {
-            if (outputText[idx] !== word[idx]) changed += 1;
-          }
-          const percent = Math.round((changed / movableCount) * 100);
-          const rating = percent < 30 ? 'Low' : percent < 70 ? 'Medium' : 'High';
-          entropyLabel = `Entropy: ${percent}% (${rating})`;
-        } else {
-          entropyLabel = 'Entropy: 0% (None)';
-        }
+      const outputLength = outputText.length;
+      let changedCount = 0;
+      for (const idx of movable) {
+        if (outputText[idx] !== word[idx]) changedCount += 1;
       }
-      document.getElementById('entropyRating').textContent = entropyLabel;
+      const unchangedCount = movableCount - changedCount;
+      const rounds = Math.max(1, parsed.repeat || 1);
+      const keyOps = parsed.ops || [];
+      const avgShift = keyOps.length
+        ? (keyOps.reduce((sum, op) => sum + (Number(op.shift) || 0), 0) / keyOps.length).toFixed(2)
+        : '0.00';
+      const percent = movableCount > 0 && outputText ? Math.round((changedCount / movableCount) * 100) : 0;
+      const rating = percent < 30 ? 'Low' : percent < 70 ? 'Medium' : 'High';
+      const entropyLabel = movableCount > 0
+        ? (outputText ? `${percent}% (${rating})` : '0% (None)')
+        : 'N/A';
+
+      document.getElementById('charMetrics').textContent = `Chars: ${total} | Movable: ${movableCount}`;
+      document.getElementById('entropyRating').textContent = `Entropy: ${entropyLabel}`;
+
+      updateStatsPanel({
+        inputLength: total,
+        outputLength,
+        movableCount,
+        changedCount,
+        unchangedCount,
+        avgShift,
+        rounds,
+        entropyLabel
+      });
+      if (settings.enableStatsPanel) {
+        updateDeveloperStats();
+      }
     }
 
     function handleLiveInputUpdate() {
@@ -1104,6 +1449,7 @@
     function syncSettingsFromUi() {
       settings.caseSensitiveReversion = document.getElementById('caseSensitiveReversion').checked;
       settings.liveEncrypt = document.getElementById('liveEncrypt').checked;
+      settings.enableStatsPanel = document.getElementById('enableStatsPanel').checked;
       const selected = document.querySelector('input[name="reverseMode"]:checked');
       if (selected) settings.reverseMode = selected.value;
       updateMetrics();
@@ -1371,17 +1717,53 @@
     document.getElementById('secretCloseBtn').addEventListener('click', hideSecretOverlay);
     document.getElementById('settingsBtn').addEventListener('click', openSettingsPanel);
     document.getElementById('settingsCloseBtn').addEventListener('click', closeSettingsPanel);
+    document.getElementById('achievementsBtn').addEventListener('click', openAchievementsPanel);
+    document.getElementById('achievementsCloseBtn').addEventListener('click', closeAchievementsPanel);
+    document.getElementById('developerCloseBtn').addEventListener('click', closeDeveloperPanel);
+    document.getElementById('savePresetBtn').addEventListener('click', saveCurrentPreset);
+    document.getElementById('loadPresetBtn').addEventListener('click', () => {
+      updatePresetPicker();
+      const picker = document.getElementById('presetPicker');
+      if (picker) {
+        picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+      }
+    });
     document.getElementById('caseSensitiveReversion').addEventListener('change', syncSettingsFromUi);
+    document.getElementById('enableStatsPanel').addEventListener('change', syncSettingsFromUi);
     document.querySelectorAll('input[name="reverseMode"]').forEach(input => input.addEventListener('change', syncSettingsFromUi));
 
     // Enter behavior
     document.getElementById('keyInput').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') doEncrypt();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const raw = this.value.trim();
+        if (runPresetCommand(raw)) {
+          updateMetrics();
+          return;
+        }
+        const presetMatch = raw.match(/^@([A-Za-z0-9_-]+)$/);
+        if (presetMatch) {
+          const loaded = loadPresetByName(presetMatch[1]);
+          if (loaded) {
+            this.value = loaded;
+            updateMetrics();
+            return;
+          }
+        }
+        doEncrypt();
+      }
     });
     document.getElementById('wordInput').addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && e.shiftKey) {
         e.preventDefault();
         doEncrypt();
+      }
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.ctrlKey && e.altKey && e.shiftKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        openDeveloperPanel();
       }
     });
 
@@ -1456,6 +1838,7 @@
       const keyInput = document.getElementById('keyInput');
       keyInput.value = k;
       checkKeyAchievements(k);
+      unlockAchievement('randomRitual');
       keyInput.focus();
       const prev = keyInput.style.background;
       keyInput.style.background = '#eaffea';
@@ -1504,6 +1887,8 @@
     // Boot Up Sequence: Load from storage first, update variables, then draw metrics safely
     loadAchievements();
     loadSettings();
+    loadPresets();
+    loadEncryptCount();
     updateMetrics();
     if (settings.liveEncrypt) {
       doEncrypt();
@@ -1649,6 +2034,7 @@
 
       if (foundKey) {
         unlockAchievement('cryptanalyst');
+        unlockAchievement('reverseWizard');
         const elapsedMs = performance.now() - startTime;
         const elapsedSec = elapsedMs / 1000;
         let elapsed;
