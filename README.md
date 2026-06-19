@@ -131,6 +131,32 @@ AB3-
 
 ---
 
+## Presets
+
+How to save presets:
+
+1. Type the desired key in the key box
+2. Click the 'Save Preset' button
+3. Choose the preset's name
+
+OR
+
+- Type the command /save presetname key in the key box
+
+How to load presets:
+
+1. Click the 'Load Presets' button
+2. Choose one of the previously saved presets
+
+OR
+
+- Type the command /load presetname in the key box
+
+OR
+
+1. In the key box, type @presetname
+2. Click Enter
+
 ## Reverse mode
 
 The reverse function attempts to generate a compatible key from:
