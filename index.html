@@ -283,7 +283,7 @@
 
     <label for="keyInput">Key (numbers or letters)</label>
     <input type="text" id="keyInput">
-    <div class="note">Type /help for commands like /save presetname key, /load presetname, /delete preset presetname.</div>
+    <div class="note">Type /help for commands related to presets.</div>
     <div id="presetControls" style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
       <button id="savePresetBtn" class="ghost">Save Preset</button>
       <button id="loadPresetBtn" class="ghost">Load Preset</button>
@@ -291,10 +291,6 @@
     <div id="presetPicker" style="display:none; margin-top:8px; padding:10px; border:1px solid #e2e8f0; background:#f9fafb; border-radius:8px;">
       <div style="font-size:0.9em; font-weight:700; margin-bottom:6px;">Presets</div>
       <div id="presetButtons" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
-    </div>
-    <div id="statusBar" class="statusBar">
-      <div id="charMetrics">Chars: 0 | Movable: 0</div>
-      <div id="entropyRating">Entropy: N/A</div>
     </div>
     <div id="statsPanel" style="display:none; margin-top:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px;"></div>
 
@@ -917,16 +913,23 @@
       const parsed = parseKeyDetailed(key);
       const result = encrypt(word, key);
       const rounds = parsed.repeat && parsed.repeat > 1 ? ` (${parsed.repeat} Rounds)` : '';
-      document.getElementById('output').textContent = result ? `Encrypted${rounds}: ${result}` : '';
+      const outputEl = document.getElementById('output');
+      if (outputEl) {
+        outputEl.textContent = result ? `Encrypted${rounds}: ${result}` : '';
+      }
+      const metrics = updateMetrics();
+      if (metrics && metrics.entropyLabel.includes('100%')) {
+        unlockAchievement('totalChaos');
+      }
+    }
+
+    function handleManualEncrypt() {
       encryptCount += 1;
       localStorage.setItem(ENCRYPT_COUNT_KEY, String(encryptCount));
       if (encryptCount >= 100) {
         unlockAchievement('touchSomeGrass');
       }
-      updateMetrics();
-      if (document.getElementById('entropyRating').textContent.includes('100%')) {
-        unlockAchievement('totalChaos');
-      }
+      doEncrypt();
     }
 
     function doDecrypt() {
@@ -936,11 +939,14 @@
       const parsed = parseKeyDetailed(key);
       const result = decrypt(word, key);
       const rounds = parsed.repeat && parsed.repeat > 1 ? ` (${parsed.repeat} Rounds)` : '';
-      document.getElementById('output').textContent = result ? `Decrypted${rounds}: ${result}` : '';
+      const outputEl = document.getElementById('output');
+      if (outputEl) {
+        outputEl.textContent = result ? `Decrypted${rounds}: ${result}` : '';
+      }
       updateMetrics();
     }
 
-    document.getElementById('encryptBtn').onclick = doEncrypt;
+    document.getElementById('encryptBtn').onclick = handleManualEncrypt;
     document.getElementById('decryptBtn').onclick = doDecrypt;
 
     const konamiPattern = ['up','up','down','down','left','right','left','right'];
@@ -980,7 +986,6 @@
 
     // Default achievement definitions
     let achievements = {
-      cryptanalyst: { name: "The Cryptanalyst", desc: "Successfully reversed a custom key!", unlocked: false },
       bigBrain: { name: "Big Brain Logic", desc: "Used a conditional flag (? or !) in your key!", unlocked: false },
       infinity: { name: "To Infinity... and beyond!", desc: "Activated the infinite extender (-) flag!", unlocked: false },
       snakeUnlocked: { name: "Sssssuccess", desc: "Discovered the hidden Snake mini-game!", unlocked: false },
@@ -990,7 +995,7 @@
       reverseWizard: { name: "Reverse Wizard", desc: "Resolved a reverse search!", unlocked: false },
       totalChaos: {name: "Total Chaos", desc: "Encrypted a key with 100% Entropy!", unlocked: false },
       doomedSociety: {name: "Doomed Society",desc: "Total brainrot.", unlocked: false},
-      touchSomeGrass: {name: "Touch Some Grass", desc: "Encrypted 100 times!", unlocked: false},
+      touchSomeGrass: {name: "Touch Some Grass", desc: "Clicked Encrypt 100 times!", unlocked: false},
       devMode: {name: "Developer Mode", desc: "Opened the secret developer screen!", unlocked: false}
     };
 
@@ -1212,11 +1217,12 @@
           document.getElementById('output').textContent = 'Usage: /load presetname';
           return true;
         }
-        if (!map[name]) {
+        const presetValue = loadPresetByName(name);
+        if (presetValue === null) {
           document.getElementById('output').textContent = `Preset @${name} not found.`;
           return true;
         }
-        document.getElementById('keyInput').value = map[name];
+        document.getElementById('keyInput').value = presetValue;
         document.getElementById('output').textContent = `Loaded preset @${name}`;
         return true;
       }
@@ -1232,7 +1238,7 @@
           document.getElementById('output').textContent = 'Usage: /delete preset presetname';
           return true;
         }
-        if (!map[name]) {
+        if (!Object.prototype.hasOwnProperty.call(map, name) || map[name] === undefined || map[name] === null) {
           document.getElementById('output').textContent = `Preset @${name} not found.`;
           return true;
         }
@@ -1251,14 +1257,21 @@
       const picker = document.getElementById('presetPicker');
       const buttons = document.getElementById('presetButtons');
       if (!picker || !buttons) return;
-      const names = Object.keys(getPresetMap()).sort();
+      const map = getPresetMap();
+      const names = Object.keys(map)
+        .filter(name => typeof name === 'string' && name.length > 0 && name !== 'undefined')
+        .filter(name => map[name] !== undefined && map[name] !== null && map[name] !== '')
+        .sort();
       if (!names.length) {
         picker.style.display = 'none';
+        buttons.innerHTML = '';
         return;
       }
       picker.style.display = 'block';
       buttons.innerHTML = '';
       names.forEach(name => {
+        const value = map[name];
+        if (value === undefined || value === null || value === '') return;
         const btn = document.createElement('button');
         btn.className = 'ghost';
         btn.textContent = `@${name}`;
@@ -1266,7 +1279,9 @@
         btn.style.fontSize = '0.9rem';
         btn.addEventListener('click', () => {
           const keyInput = document.getElementById('keyInput');
-          keyInput.value = getPresetMap()[name];
+          const presetValue = loadPresetByName(name);
+          if (presetValue === null) return;
+          keyInput.value = presetValue;
           checkKeyAchievements(keyInput.value);
           handleLiveInputUpdate();
         });
@@ -1275,7 +1290,12 @@
     }
 
     function loadPresetByName(name) {
-      return getPresetMap()[name] || null;
+      const safeName = normalizePresetName(name);
+      if (!safeName) return null;
+      const map = getPresetMap();
+      if (!Object.prototype.hasOwnProperty.call(map, safeName)) return null;
+      const value = map[safeName];
+      return (value === undefined || value === null || value === '') ? null : value;
     }
 
     function renderAchievements() {
@@ -1361,7 +1381,8 @@
     }
 
     function getOutputText() {
-      const out = document.getElementById('output').textContent || '';
+      const outEl = document.getElementById('output');
+      const out = outEl ? (outEl.textContent || '') : '';
       return out.replace(/^(Encrypted|Decrypted)(?:\s*\([^)]*\))?:\s*/, '');
     }
 
@@ -1372,8 +1393,6 @@
       if (!settings.enableStatsPanel) return;
       panel.innerHTML = `
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;">
-          <div><strong>Input:</strong> ${stats.inputLength}</div>
-          <div><strong>Output:</strong> ${stats.outputLength}</div>
           <div><strong>Movable:</strong> ${stats.movableCount}</div>
           <div><strong>Changed:</strong> ${stats.changedCount}</div>
           <div><strong>Unchanged:</strong> ${stats.unchangedCount}</div>
@@ -1391,7 +1410,6 @@
       const movable = getMovableIndices(word, parsed.flags);
       const total = word.length;
       const movableCount = movable.length;
-      const outputLength = outputText.length;
       let changedCount = 0;
       for (const idx of movable) {
         if (outputText[idx] !== word[idx]) changedCount += 1;
@@ -1408,22 +1426,20 @@
         ? (outputText ? `${percent}% (${rating})` : '0% (None)')
         : 'N/A';
 
-      document.getElementById('charMetrics').textContent = `Chars: ${total} | Movable: ${movableCount}`;
-      document.getElementById('entropyRating').textContent = `Entropy: ${entropyLabel}`;
-
-      updateStatsPanel({
-        inputLength: total,
-        outputLength,
+      const metrics = {
         movableCount,
         changedCount,
         unchangedCount,
         avgShift,
         rounds,
         entropyLabel
-      });
+      };
+
+      updateStatsPanel(metrics);
       if (settings.enableStatsPanel) {
         updateDeveloperStats();
       }
+      return metrics;
     }
 
     function handleLiveInputUpdate() {
@@ -2033,7 +2049,6 @@
       }
 
       if (foundKey) {
-        unlockAchievement('cryptanalyst');
         unlockAchievement('reverseWizard');
         const elapsedMs = performance.now() - startTime;
         const elapsedSec = elapsedMs / 1000;
