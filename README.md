@@ -14,9 +14,9 @@ This cipher is NOT secure compared to others as the original input can be found 
 - Ignore spaces / punctuation / paragraph flags
 - Live encryption mode
 - Random key generator
-- Entropy + character metrics
+- Character metrics
 - Copy output to clipboard
-- Settings saved locally
+- Settings and presets saved locally
 - Hidden Snake mini-game easter egg
 
 ---
@@ -49,11 +49,15 @@ DOG → 4 15 7
 
 ### Multi-digit numbers
 
+ Surrounding a number with brackets allow for the possibility for shifts bigger than 26 (using letters) and negative numbers allow shifts in the opposite direction.
+ 
 ```text
 (12)(-4)(26)
 ```
 
 ### Flags
+
+Using flags on the key gives the possibility to ignore certain characters. Ignoring means that no shift is applied to them and they are dispensable on the encryption and decryption.
 
 | Flag | Meaning |
 |---|---:|
@@ -71,7 +75,13 @@ HELLO123_:
 
 ## Conditionals
 
-Conditionals apply shifts only when conditions are met.
+Conditionals apply shifts only when conditions are met. The shift that is conditioned is put after the condition.
+There are positive conditionals ('apply shift if' - ?) and negative conditionals ('apply shift unless' - !).
+In each conditional type there are also two types: letter conditionals (the condition is defined by the current character's **letter**) and index conditionals (the condition is defined by the **index** of the current character).
+
+### Letter conditionals:
+
+Can be defined by a rule (vowel or consonant), by a specific letter, by a group of letters and a range of letters.
 
 Examples:
 
@@ -88,27 +98,74 @@ Apply only to vowels
 Apply only to consonants
 
 ```text
-?=A,E,I,O,U
+?=E
 ```
 
-Apply only to specific letters
+Apply to the letter E
 
 ```text
-!V
+?=A,H,W,B
 ```
 
-Apply to everything except vowels
+Apply only to the letters A, B, H and W
 
 ```text
-?i(1,3,5)
+?=E-K
 ```
 
-Apply only to positions 1, 3, and 5
+Apply to the letters from E to K in the alphabetical order
+
+### Index Conditionals
+
+The first character has an index of 1 counting up
+
+```text
+?i(3)
+```
+
+Apply only to character in position 3
+
+```text
+?i(3,5)
+```
+
+Apply to the characters in positions 3 and 5
+
+```text
+?i(2-7)
+```
+
+Apply to the characters in positions from 2 up to 7
+
+```text
+?i(>=6)
+```
+
+Apply to the characters in positions of index bigger than or equal to 6 (can support >, <, >= and <=)
+
+```text
+?ie
+```
+
+Apply to the characters in positions of an even number
+
+```text
+?io
+```
+
+Apply to the characters in positions of an odd number
+
+```text
+?i(%3)
+```
+
+Apply to the characters in positions in jumps of 3
 
 ---
 
 ## Rounds
 
+Using rounds you can run the encryption process multiple times. Set the number of repetitions after the #.
 Repeat the encryption multiple times:
 
 ```text
@@ -129,9 +186,13 @@ Example:
 AB3-
 ```
 
+This example translates the key to 'AB3333333...'
+
 ---
 
 ## Presets
+
+Presets can be used to save and load specific keys to the device.
 
 How to save presets:
 
@@ -141,7 +202,7 @@ How to save presets:
 
 OR
 
-- Type the command /save presetname key in the key box
+- Type the command '/save [presetname] [key]' in the key box
 
 How to load presets:
 
@@ -150,7 +211,7 @@ How to load presets:
 
 OR
 
-- Type the command /load presetname in the key box
+- Type the command '/load [presetname]' in the key box
 
 OR
 
@@ -167,7 +228,15 @@ The reverse function attempts to generate a compatible key from:
 Modes:
 
 - Deep Search
-- Quick & Big
+- Direct Mapping
+
+Deep Search brute forces a key counting up starting on 0 to check if each key works. The downside is that it is really slow and doesnt work realistically for medium to big inputs.
+
+Direct Mapping uses simple map to determine a key using the formula:
+
+$$\text{shift} = \text{foundIndex} - \text{currentIndex}$$
+
+The downside is that the resulting key is the same or bigger size than the input.
 
 ---
 
@@ -175,21 +244,19 @@ Modes:
 
 There’s a hidden Snake mini-game.
 
-Desktop:
+On desktop press the arrow keys in this sequence:
 
 ```text
 ↑ ↑ ↓ ↓ ← → ← →
 ```
 
-Mobile:
-
-Enter:
+On mobile enter this:
 
 ```text
 ↑↑↓↓←→←→
 ```
 
-into the input box.
+into the input box and press Encrypt.
 
 ---
 
@@ -219,7 +286,6 @@ Possible future additions:
 
 - Help panel
 - Key export/import
-- Encryption presets
 - Save encrypted sessions
 - Theme customization
 - Better reverse-key optimization
@@ -238,6 +304,6 @@ v1.10
 
 Created this cipher in Biology class while I wasn't paying attention... hope this inspires you not to pay attention in class!
 
-I don't have a name for it so if you have a suggestion please notify me
+I don't have a name for it so if you have a suggestion please notify me.
 
 Credit isn't mandatory but it's really appreciated! :D
