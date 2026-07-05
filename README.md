@@ -178,7 +178,7 @@ Runs 3 rounds.
 
 ## Extender
 
-Use `-` at the end of the key to repeat the last shift indefinitely.
+Use `-` at the end of the key to repeat the final shift for all remaining characters.
 
 Example:
 
@@ -230,13 +230,13 @@ Modes:
 - Deep Search
 - Direct Mapping
 
-Deep Search brute forces a key counting up starting on 0 to check if each key works. The downside is that it is really slow and doesnt work realistically for medium to big inputs.
+Deep Search brute-forces keys starting from 0, testing each candidate until a compatible key is found. The downside is that it is really slow and doesnt work realistically for medium to big sized inputs.
 
-Direct Mapping uses simple map to determine a key using the formula:
+Direct Mapping uses simple math to determine a compatible key using the formula:
 
 $$\text{shift} = \text{foundIndex} - \text{currentIndex}$$
 
-The downside is that the resulting key is the same or bigger size than the input.
+The downside is that the resulting key length is the same or bigger than the input length.
 
 ---
 
@@ -285,7 +285,6 @@ No dependencies required.
 Possible future additions:
 
 - Help panel
-- Key export/import
 - Save encrypted sessions
 - Theme customization
 - Better reverse-key optimization
