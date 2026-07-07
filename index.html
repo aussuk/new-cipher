@@ -300,11 +300,13 @@
       <button id="reverseBtn" class="ghost">Reverse</button>
       <button id="randomKeyBtn" class="ghost">Random Key</button>
       <button id="copyBtn" class="ghost">Copy Output</button>
+      <button id="compileBtn" class="ghost">Compile Key</button>
       <button id="achievementsBtn" class="ghost">Achievements</button>
       <button id="settingsBtn" class="ghost">Settings</button>
     </div>
 
     <div class="output" id="output"></div>
+    <div id="compileOutput" class="note" style="margin-top:8px; display:none;"></div>
   </div>
 
   <div class="mobile-snake-controls" id="mobileSnakeControls">
@@ -520,6 +522,229 @@
       return idx;
     }
 
+    function formatPrimitiveValue(value) {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return '';
+      if (num >= 1 && num <= 9) return String(num);
+      return `(${num})`;
+    }
+
+    function findMatchingDelimiter(text, startIndex, closeChar) {
+      let depth = 0;
+      for (let i = startIndex; i < text.length; i++) {
+        const ch = text[i];
+        if (ch === '[' || ch === '(') depth++;
+        if (ch === closeChar) {
+          depth--;
+          if (depth === 0) return i;
+        }
+        if (ch === ']' || ch === ')') {
+          if (depth <= 0) return i;
+        }
+      }
+      return -1;
+    }
+
+    function readConditionalToken(text, startIndex) {
+      const ch = text[startIndex];
+      if (ch !== '?' && ch !== '!') return null;
+      const next = text[startIndex + 1] || '';
+      if (next === '=') {
+        let j = startIndex + 2;
+        while (j < text.length && /[A-Za-z\-,\[\]]/.test(text[j])) j++;
+        return { token: text.slice(startIndex, j), nextIndex: j - 1 };
+      }
+      if (next === '(') {
+        const end = findMatchingDelimiter(text, startIndex + 1, ')');
+        if (end !== -1) {
+          return { token: text.slice(startIndex, end + 1), nextIndex: end };
+        }
+      }
+      if (/^[VCvc]$/.test(next)) {
+        return { token: text.slice(startIndex, startIndex + 2), nextIndex: startIndex + 1 };
+      }
+      if (next && next.toLowerCase() === 'i') {
+        let j = startIndex + 2;
+        if (j < text.length && /^[eo]$/i.test(text[j])) {
+          return { token: text.slice(startIndex, j + 1), nextIndex: j };
+        }
+        if (j < text.length && text[j] === '(') {
+          const end = findMatchingDelimiter(text, j, ')');
+          if (end !== -1) {
+            return { token: text.slice(startIndex, end + 1), nextIndex: end };
+          }
+        }
+        return { token: text.slice(startIndex, startIndex + 2), nextIndex: startIndex + 1 };
+      }
+      return { token: text.slice(startIndex, startIndex + 1), nextIndex: startIndex };
+    }
+
+    function readSignedNumberToken(text, startIndex) {
+      const ch = text[startIndex] || '';
+      let j = startIndex;
+      let sign = '';
+      if (ch === '-') {
+        sign = '-';
+        j += 1;
+      }
+      if (j >= text.length || !/\d/.test(text[j])) return null;
+      while (j < text.length && /\d/.test(text[j])) j += 1;
+      return { value: Number(sign + text.slice(startIndex + sign.length, j)), endIndex: j - 1 };
+    }
+
+    function compileKeyToPrimitive(rawKey) {
+      const raw = String(rawKey || '');
+      if (!raw) return { compiledKey: '', length: 0 };
+
+      const flagsSuffix = raw.match(/[_:¶]+$/)?.[0] || '';
+      const hasExtender = /-$/.test(raw.replace(/[_:¶]/g, '').replace(/#\d+/g, ''));
+      const keyWorking = raw.replace(/[_:¶]/g, '').replace(/#\d+/g, '').replace(/-$/, '');
+      const parts = [];
+      let pendingCond = '';
+      let lastExtenderPattern = '';
+
+      function appendToken(token, cond = '') {
+        if (!token) return;
+        const prefix = cond || pendingCond;
+        const emitted = prefix ? prefix + token : token;
+        if (prefix) {
+          parts.push(emitted);
+        } else {
+          parts.push(token);
+        }
+        lastExtenderPattern = emitted;
+      }
+
+      function emitExpandedGroup(body, condPrefix = '') {
+        const items = body.split(',').map(s => s.trim()).filter(Boolean);
+        const out = [];
+        for (const item of items) {
+          const token = compileKeyToken(item);
+          if (!token) continue;
+          const prefix = condPrefix || '';
+          out.push(prefix ? prefix + token : token);
+        }
+        return out;
+      }
+
+      for (let i = 0; i < keyWorking.length; i++) {
+        const ch = keyWorking[i];
+        if (ch === '?' || ch === '!') {
+          const parsed = readConditionalToken(keyWorking, i);
+          if (parsed) {
+            pendingCond = parsed.token;
+            i = parsed.nextIndex;
+            continue;
+          }
+        }
+
+        const signedNumber = readSignedNumberToken(keyWorking, i);
+        if (signedNumber) {
+          appendToken(formatPrimitiveValue(signedNumber.value));
+          i = signedNumber.endIndex;
+          continue;
+        }
+
+        if (ch === '[') {
+          const end = findMatchingDelimiter(keyWorking, i, ']');
+          if (end !== -1) {
+            const body = keyWorking.slice(i + 1, end);
+            const expanded = emitExpandedGroup(body, pendingCond);
+            expanded.forEach(token => parts.push(token));
+            lastExtenderPattern = expanded.join('');
+            pendingCond = '';
+            i = end;
+            continue;
+          }
+        }
+
+        if (ch === '(') {
+          const end = findMatchingDelimiter(keyWorking, i, ')');
+          if (end !== -1) {
+            const inner = keyWorking.slice(i + 1, end).trim();
+            if (/^-?\d+$/.test(inner)) {
+              appendToken(formatPrimitiveValue(Number(inner)));
+              i = end;
+              continue;
+            }
+          }
+        }
+
+        if (/[A-Za-z]/.test(ch)) {
+          appendToken(formatPrimitiveValue(letterToNumber(ch)));
+          continue;
+        }
+      }
+
+      const compiledRaw = parts.join('');
+      const compacted = compactCompiledKey(compiledRaw, { hasExtender, extenderRepeatPattern: lastExtenderPattern });
+      const compiledWithFlags = compacted + flagsSuffix;
+      const length = hasExtender ? '∞' : compiledWithFlags.length;
+      return { compiledKey: compiledWithFlags, length, expandedKey: compiledRaw + flagsSuffix };
+    }
+
+    function compileKeyToken(token) {
+      const trimmed = String(token || '').trim();
+      if (!trimmed) return '';
+      if (/^\d+$/.test(trimmed)) {
+        return formatPrimitiveValue(Number(trimmed));
+      }
+      if (/^-\d+$/.test(trimmed)) {
+        return formatPrimitiveValue(Number(trimmed));
+      }
+      if (/^[A-Za-z]$/.test(trimmed)) {
+        return formatPrimitiveValue(letterToNumber(trimmed));
+      }
+      if (/^\(-?\d+\)$/.test(trimmed)) {
+        return trimmed;
+      }
+      return trimmed;
+    }
+
+    function compactCompiledKey(compiledKey, options = {}) {
+      if (!compiledKey) return '';
+      const { hasExtender = false, extenderRepeatPattern = '' } = options;
+      if (hasExtender) {
+        const repeatTail = extenderRepeatPattern || getExtenderRepeatPattern(compiledKey);
+        if (repeatTail) {
+          return `${compiledKey}${repeatTail.repeat(8)}…`;
+        }
+      }
+      let output = compiledKey;
+      const repeatPattern = detectRepeatPattern(compiledKey);
+      if (repeatPattern) {
+        output = `${repeatPattern.pattern}${repeatPattern.repeat > 1 ? '…' : ''}`;
+      }
+      return output;
+    }
+
+    function getExtenderRepeatPattern(compiledKey) {
+      if (!compiledKey) return '';
+      const tail = compiledKey.slice(-8);
+      const parenthesized = tail.match(/\([^)]+\)$/);
+      if (parenthesized) return parenthesized[0];
+      const simple = tail.match(/[0-9A-Za-z]+$/);
+      if (simple) return simple[0];
+      return compiledKey.slice(-1);
+    }
+
+    function detectRepeatPattern(text) {
+      if (!text || text.length < 4) return null;
+      for (let len = 1; len <= Math.floor(text.length / 2); len++) {
+        const pattern = text.slice(0, len);
+        let repeatCount = 1;
+        let built = pattern;
+        while (built.length < text.length) {
+          built += pattern;
+          repeatCount++;
+        }
+        if (built === text) {
+          return { pattern, repeat: repeatCount };
+        }
+      }
+      return null;
+    }
+
     // Detailed key parser:
     // supports flags (_ : ¶), repeat suffix #N (clamped 1..5),
     // digits, parentheses or brackets for multi-digit numbers and grouped shifts,
@@ -665,6 +890,19 @@
 
       for (let i = 0; i < key.length; i++) {
         const ch = key[i];
+        const signedNumber = readSignedNumberToken(key, i);
+        if (signedNumber) {
+          pushShift(signedNumber.value);
+          clearPendingConds();
+          rememberLastGroup(ops.length - 1, 1);
+          if (maybeAttachExtender(signedNumber.endIndex + 1, ops.length - 1, 1)) {
+            i = signedNumber.endIndex;
+          } else {
+            i = signedNumber.endIndex;
+          }
+          continue;
+        }
+
         if (ch === '?' || ch === '!') {
           const neg = ch === '!';
           const next = key[i + 1] || '';
@@ -823,17 +1061,6 @@
             i = parsedGroup.nextIndex;
           }
           clearPendingConds();
-          continue;
-        }
-
-        // single digit shift
-        if (/\d/.test(ch)) {
-          pushShift(Number(ch));
-          clearPendingConds();
-          rememberLastGroup(ops.length - 1, 1);
-          if (maybeAttachExtender(i + 1, ops.length - 1, 1)) {
-            i += 1;
-          }
           continue;
         }
 
@@ -1498,6 +1725,19 @@
         </div>`;
     }
 
+    function showCompiledKeyResult(rawKey) {
+      const result = compileKeyToPrimitive(rawKey);
+      const compileOutput = document.getElementById('compileOutput');
+      if (compileOutput) {
+        compileOutput.style.display = 'block';
+        const lengthText = result.length === '∞' ? 'length ∞' : `length ${result.length}`;
+        compileOutput.textContent = result.compiledKey
+          ? `${result.compiledKey}  ·  ${lengthText}`
+          : '(empty)';
+      }
+      return result;
+    }
+
     function updateMetrics() {
       const word = document.getElementById('wordInput').value || '';
       const key = document.getElementById('keyInput').value || '';
@@ -1881,11 +2121,51 @@
 
     // Random Key Generator
     function generateRandomKey(min = 2, max = 15) {
-      const baseChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ123456789';
       const len = Math.floor(Math.random() * (max - min + 1)) + min;
-      // build base key (shifts as letters/numbers)
       let parts = [];
-      for (let i = 0; i < len; i++) parts.push(baseChars[Math.floor(Math.random() * baseChars.length)]);
+
+      function randomShiftToken(withGroup = false) {
+        const roll = Math.random();
+        if (roll < 0.16) {
+          return String.fromCharCode(65 + Math.floor(Math.random() * 26));
+        }
+        if (roll < 0.32) {
+          return String(Math.floor(Math.random() * 10));
+        }
+        if (roll < 0.48) {
+          const sign = Math.random() < 0.35 ? '-' : '';
+          const value = String(Math.floor(Math.random() * 90) + 10);
+          return sign + value;
+        }
+        if (roll < 0.64) {
+          const sign = Math.random() < 0.4 ? '-' : '';
+          const value = String(Math.floor(Math.random() * 90) + 10);
+          return '(' + sign + value + ')';
+        }
+        if (withGroup && roll < 0.82) {
+          const count = Math.floor(Math.random() * 3) + 2;
+          const items = [];
+          for (let i = 0; i < count; i++) {
+            const itemRoll = Math.random();
+            if (itemRoll < 0.3) {
+              items.push(String(Math.floor(Math.random() * 10)));
+            } else if (itemRoll < 0.6) {
+              items.push(String(Math.floor(Math.random() * 90) + 10));
+            } else if (itemRoll < 0.9) {
+              items.push('-' + String(Math.floor(Math.random() * 90) + 10));
+            } else {
+              items.push(String.fromCharCode(65 + Math.floor(Math.random() * 26)));
+            }
+          }
+          return '[' + items.join(',') + ']';
+        }
+        return String(Math.floor(Math.random() * 90) + 10);
+      }
+
+      for (let i = 0; i < len; i++) {
+        const allowGroup = i > 0 && (Math.random() < 0.25 || parts[parts.length - 1].startsWith('?') || parts[parts.length - 1].startsWith('!'));
+        parts.push(randomShiftToken(allowGroup));
+      }
 
       // helper to build a conditional token
       function randomConditional() {
@@ -1916,16 +2196,20 @@
         }
       }
 
+      function isConditionalToken(token) {
+        return typeof token === 'string' && (/^\?/.test(token) || /^!/.test(token));
+      }
+
       // randomly insert 0..2 conditionals into the parts array (ensure each conditional precedes a shift token)
       const condCount = Math.random() < 0.45 ? (Math.random() < 0.2 ? 2 : 1) : 0; // ~45% chance to add cond(s)
       for (let c = 0; c < condCount; c++) {
         const token = randomConditional();
 
-        // find indices of real shift tokens (letters/digits or paren numbers) to insert BEFORE them
+        // find indices of real shift tokens to insert BEFORE them
         const candidatePositions = [];
         for (let i = 0; i < parts.length; i++) {
           const p = parts[i];
-          if (/^[A-Za-z0-9]$/.test(p) || /^\(\-?\d+\)$/.test(p)) candidatePositions.push(i);
+          if (!isConditionalToken(p)) candidatePositions.push(i);
         }
 
         if (candidatePositions.length === 0) break; // nothing valid to attach to
@@ -1935,6 +2219,13 @@
       }
 
       let k = parts.join('');
+      const hasGroup = /\[[^\]]+\]/.test(k);
+      if (hasGroup && Math.random() < 0.35) {
+        k = k + '-';
+      } else if (!hasGroup && Math.random() < 0.25) {
+        const value = String(Math.floor(Math.random() * 90) + 10);
+        k = k + value;
+      }
 
       // small chance to append flags as before
       const r = Math.random();
@@ -1983,6 +2274,13 @@
     }
 
     document.getElementById('copyBtn').addEventListener('click', copyOutput);
+    document.getElementById('compileBtn').addEventListener('click', () => {
+      const key = document.getElementById('keyInput').value;
+      const result = showCompiledKeyResult(key);
+      if (result.compiledKey) {
+        document.getElementById('output').textContent = '';
+      }
+    });
     
     // Listeners that update settings and save when user changes them
     document.getElementById('liveEncrypt').addEventListener('change', syncSettingsFromUi);
