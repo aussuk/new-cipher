@@ -57,7 +57,7 @@ Surrounding a number with brackets allows for the possibility for shifts bigger 
 (12)(-4)(26)
 ```
 
-These multi-digit/negative numbers can also be all on the same pair of brackets, separating them using commas, which uses up less characters. *
+These multi-digit/negative numbers can also be all on the same pair of brackets, separating them using commas, which uses up less characters.
 
 ```text
 (63,-2,900) -- 11 characters
@@ -173,10 +173,10 @@ Apply to the characters in positions in jumps of 3
 
 ---
 
-### Groups *
+### Groups
 
 Using square brackets you can make a group.
-Groups are used to apply one argument to many shifts at a time, saving time and key length.
+Groups behave like normal brackets but are mainly used to apply one argument to many shifts at a time, saving time and key length.
 
 Without grouping:
 
@@ -190,7 +190,7 @@ With grouping:
 ?C[3,-2,E]
 ```
 
-It can also be used for more complex [Extender](#extender) functionality
+It can also be used for more complex [extender](#extender) functionality
 
 ```text
 123[4,5,6]-
@@ -309,13 +309,7 @@ Clone:
 git clone https://github.com/aussuk/new-cipher.git
 ```
 
-Open:
-
-```bash
-index.html
-```
-
-in your browser.
+Open `index.html` in your browser.
 
 No dependencies required.
 
