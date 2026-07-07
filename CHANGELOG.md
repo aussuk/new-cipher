@@ -9,8 +9,9 @@
 - Statistics panel is now toggleable in the settings;
 - Added Achievements panel;
 - Added a secret developer mode using a certain combination of keys to unlock very serious information;
-- Added the possiblity to have multiple numbers inside brackets
-- Added groups.
+- Added the possiblity to have multiple numbers inside brackets;
+- Added groups;
+- Updated Random Key Generator to support new features.
   
 ## v1.9:
 - Added a key strength meter that evaluates the complexity of the key based on various factors (length, character variety, use of conditionals, etc.);
