@@ -17,7 +17,9 @@ This cipher is NOT secure compared to others as the original input can be found 
 - Character metrics
 - Copy output to clipboard
 - Settings and presets saved locally
-- Hidden Snake mini-game easter egg
+- Hidden mini-game easter egg
+
+The asterisk '*' is for planned but not yet implemented features.
 
 ---
 
@@ -49,10 +51,18 @@ DOG → 4 15 7
 
 ### Multi-digit numbers
 
- Surrounding a number with brackets allow for the possibility for shifts bigger than 26 (using letters) and negative numbers allow shifts in the opposite direction.
+Surrounding a number with brackets allows for the possibility for shifts bigger than 26 (using letters) and negative numbers allow shifts in the opposite direction.
  
 ```text
 (12)(-4)(26)
+```
+
+These multi-digit/negative numbers can also be all on the same pair of brackets, separating them using commas, which uses up less characters. *
+
+```text
+(63,-2,900) -- 11 characters
+
+(63)(-2)(900) -- 13 characters
 ```
 
 ### Flags
@@ -73,13 +83,13 @@ HELLO123_:
 
 ---
 
-## Conditionals
+### Conditionals
 
 Conditionals apply shifts only when conditions are met. The shift that is conditioned is put after the condition.
 There are positive conditionals ('apply shift if' - ?) and negative conditionals ('apply shift unless' - !).
 In each conditional type there are also two types: letter conditionals (the condition is defined by the current character's **letter**) and index conditionals (the condition is defined by the **index** of the current character).
 
-### Letter conditionals:
+#### Letter conditionals:
 
 Can be defined by a rule (vowel or consonant), by a specific letter, by a group of letters and a range of letters.
 
@@ -115,7 +125,7 @@ Apply only to the letters A, B, H and W
 
 Apply to the letters from E to K in the alphabetical order
 
-### Index Conditionals
+#### Index Conditionals
 
 The first character has an index of 1 counting up
 
@@ -123,7 +133,7 @@ The first character has an index of 1 counting up
 ?i(3)
 ```
 
-Apply only to character in position 3
+Apply only to the character in position 3
 
 ```text
 ?i(3,5)
@@ -141,7 +151,7 @@ Apply to the characters in positions from 2 up to 7
 ?i(>=6)
 ```
 
-Apply to the characters in positions of index bigger than or equal to 6 (can support >, <, >= and <=)
+Apply to characters in positions with an index greater than or equal to 6 (can support >, <, >= and <=)
 
 ```text
 ?ie
@@ -163,7 +173,38 @@ Apply to the characters in positions in jumps of 3
 
 ---
 
-## Rounds
+### Groups *
+
+Using square brackets you can make a group.
+Groups are used to apply one argument to many shifts at a time, saving time and key length.
+
+Without grouping:
+
+```text
+?C3?C(-2)?CE
+```
+
+With grouping:
+
+```text
+?C[3,-2,E]
+```
+
+It can also be used for more complex [Extender](#extender) functionality
+
+```text
+123[4,5,6]-
+```
+
+That expands to:
+
+```text
+123456456456456...
+```
+
+---
+
+### Rounds
 
 Using rounds you can run the encryption process multiple times. Set the number of repetitions after the #.
 Repeat the encryption multiple times:
@@ -176,7 +217,7 @@ Runs 3 rounds.
 
 ---
 
-## Extender
+### Extender
 
 Use `-` at the end of the key to repeat the final shift for all remaining characters.
 
@@ -186,7 +227,7 @@ Example:
 AB3-
 ```
 
-This example translates the key to 'AB3333333...'
+This example expands the key to 'AB3333333...'
 
 ---
 
@@ -230,7 +271,7 @@ Modes:
 - Deep Search
 - Direct Mapping
 
-Deep Search brute-forces keys starting from 0, testing each candidate until a compatible key is found. The downside is that it is really slow and doesnt work realistically for medium to big sized inputs.
+Deep Search brute-forces keys starting from 0, testing each candidate until a compatible key is found. The downside is that it is really slow and does not work realistically for medium to large inputs.
 
 Direct Mapping uses simple math to determine a compatible key using the formula:
 
