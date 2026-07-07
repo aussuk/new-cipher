@@ -522,8 +522,8 @@
 
     // Detailed key parser:
     // supports flags (_ : ¶), repeat suffix #N (clamped 1..5),
-    // digits, parentheses for multi-digit numbers, letters -> 1..26,
-    // and conditional tokens that attach to the next shift:
+    // digits, parentheses or brackets for multi-digit numbers and grouped shifts,
+    // letters -> 1..26, and conditional tokens that attach to the next shift:
     //   ?v, ?c, ?=a,b, ?=a-c, ?i(n), ?i(n,m), ?i(n-m), ?i(>n), ?i(<=n), ?i(%n)
     //   and negated versions !v, !c, !=a,b, !=a-c, !i(>n)
     // Returns { numbers[], ops:[{shift,cond|null}], flags:{...}, repeat }
@@ -532,20 +532,21 @@
       if (!rawKey) return { numbers: [], ops: [], flags, repeat: 1 };
 
       // detect extender '-' at end (repeat last part forever)
-      let extender = false;
       let keyWorking = String(rawKey || '');
-      if (keyWorking.endsWith('-')) {
-        extender = true;
-        keyWorking = keyWorking.replace(/-$/, '');
-      }
 
       // detect repeat suffix like #2, #03, clamp 1..5
       let repeat = 1;
       const rmatch = keyWorking.match(/#(\d+)/);
       if (rmatch) repeat = Math.max(1, Math.min(5, Number(rmatch[1]) || 1));
 
-      // remove repeat tokens
-      const keyNoRepeat = keyWorking.replace(/#\d+/g, '');
+      // remove repeat tokens FIRST
+      keyWorking = keyWorking.replace(/#\d+/g, '');
+
+      // detect extender suffixes attached to the last parsed argument
+      let extender = false;
+
+      // everything below should use keyWorking
+      const keyNoRepeat = keyWorking;
 
       if (keyNoRepeat.includes('_')) flags.ignoreSpaces = true;
       if (keyNoRepeat.includes(':')) flags.ignorePunct = true;
@@ -557,11 +558,68 @@
       const numbers = [];
       const ops = [];
       const pendingConds = [];
+      let extenderCycleStart = null;
+      let extenderCycleLen = 0;
+      let lastParsedGroupStart = null;
+      let lastParsedGroupLen = 0;
 
-      function pushShift(val) {
+      function pushShift(val, conds = null) {
         numbers.push(val);
-        ops.push({ shift: val, cond: pendingConds.length ? pendingConds.slice() : null });
+        const cond = conds !== null ? conds : (pendingConds.length ? pendingConds.slice() : null);
+        ops.push({ shift: val, cond });
+      }
+
+      function rememberLastGroup(startIndex, count) {
+        lastParsedGroupStart = startIndex;
+        lastParsedGroupLen = count;
+      }
+
+      function clearPendingConds() {
         pendingConds.length = 0;
+      }
+
+      function maybeAttachExtender(index, cycleStart = null, cycleLen = null) {
+        if (key[index] !== '-') return false;
+        const rest = key.slice(index + 1);
+        if (!rest || /^[\s_:\u00b6#]*$/.test(rest)) {
+          extender = true;
+          if (cycleStart !== null && cycleLen !== null) {
+            extenderCycleStart = cycleStart;
+            extenderCycleLen = cycleLen;
+          } else if (lastParsedGroupLen > 0 && lastParsedGroupStart !== null) {
+            extenderCycleStart = lastParsedGroupStart;
+            extenderCycleLen = lastParsedGroupLen;
+          } else {
+            extenderCycleStart = Math.max(0, ops.length - 1);
+            extenderCycleLen = 1;
+          }
+          return true;
+        }
+        return false;
+      }
+
+      function parseBracketList(startIndex, openChar, closeChar) {
+        const values = [];
+        let j = startIndex + 1;
+        let payload = '';
+        while (j < key.length && key[j] !== closeChar) {
+          payload += key[j++];
+        }
+        if (j >= key.length || key[j] !== closeChar) {
+          return { values, nextIndex: startIndex };
+        }
+        const items = payload.split(',').map(s => s.trim()).filter(Boolean);
+        for (const item of items) {
+          const trimmed = item.trim();
+          if (/^-?\d+$/.test(trimmed)) {
+            values.push(Number(trimmed));
+          } else if (/^\((-?\d+)\)$/.test(trimmed)) {
+            values.push(Number(trimmed.slice(1, -1)));
+          } else if (/^[A-Za-z]$/.test(trimmed)) {
+            values.push(letterToNumber(trimmed));
+          }
+        }
+        return { values, nextIndex: j };
       }
 
       function condEquals(a, b) {
@@ -745,34 +803,54 @@
           continue;
         }
 
-        // multi-digit number in parentheses, possibly negative (e.g. (12) or (-3))
-        if (ch === '(') {
-          let j = i + 1;
-          let neg = false;
-          if (key[j] === '-') { neg = true; j++; }
-          let numStr = '';
-          while (j < key.length && /\d/.test(key[j])) numStr += key[j++];
-          const val = numStr.length ? (Number(numStr) * (neg ? -1 : 1)) : 0;
-          pushShift(val);
-          i = (j < key.length && key[j] === ')') ? j : j - 1;
+        // bracketed or parenthesized shift groups, e.g. [3,-2,E] or (63,-2,900)
+        if (ch === '[' || ch === '(') {
+          const closeChar = ch === '[' ? ']' : ')';
+          const parsedGroup = parseBracketList(i, ch, closeChar);
+          if (parsedGroup.values.length) {
+            const conds = pendingConds.length ? pendingConds.slice() : null;
+            parsedGroup.values.forEach(val => pushShift(val, conds));
+            const cycleStart = ops.length - parsedGroup.values.length;
+            const cycleLen = parsedGroup.values.length;
+            rememberLastGroup(cycleStart, cycleLen);
+            if (maybeAttachExtender(i + 1 + (parsedGroup.nextIndex - i), cycleStart, cycleLen)) {
+              i = parsedGroup.nextIndex + 1;
+            } else {
+              i = parsedGroup.nextIndex;
+            }
+          } else {
+            clearPendingConds();
+            i = parsedGroup.nextIndex;
+          }
+          clearPendingConds();
           continue;
         }
 
         // single digit shift
         if (/\d/.test(ch)) {
           pushShift(Number(ch));
+          clearPendingConds();
+          rememberLastGroup(ops.length - 1, 1);
+          if (maybeAttachExtender(i + 1, ops.length - 1, 1)) {
+            i += 1;
+          }
           continue;
         }
 
         // letter -> A=1 .. Z=26
         if (/[a-zA-Z]/.test(ch)) {
           pushShift(letterToNumber(ch));
+          clearPendingConds();
+          rememberLastGroup(ops.length - 1, 1);
+          if (maybeAttachExtender(i + 1, ops.length - 1, 1)) {
+            i += 1;
+          }
           continue;
         }
       }
 
       // compress fully-repeated patterns (e.g. 262626 -> 26)
-      return { numbers, ops, flags, repeat, extender };
+      return { numbers, ops, flags, repeat, extender, extenderCycleStart, extenderCycleLen };
     }
 
     function splitKeyFlagsSuffix(key) {
@@ -837,16 +915,24 @@
         if (m === 0) break;
 
         const baseLen = ops.length || 1;
-        const finiteLen = baseLen * rounds;
-        function getOpFor(rnd, i, linearIdx) {
-          if (!parsed.extender) return ops[i % ops.length];
-          if (linearIdx < finiteLen) return ops[linearIdx % baseLen];
-          return ops[baseLen - 1];
+        function getOpFor(i) {
+          if (!parsed.extender) {
+            return ops[i % baseLen];
+          }
+          const cycleStart = Number.isInteger(parsed.extenderCycleStart) ? parsed.extenderCycleStart : baseLen - 1;
+          const cycleLen = Number.isInteger(parsed.extenderCycleLen) && parsed.extenderCycleLen > 0 ? parsed.extenderCycleLen : 1;
+          if (cycleLen <= 0) {
+            return ops[cycleStart] || ops[baseLen - 1];
+          }
+          if (i < cycleStart) {
+            return ops[i % baseLen];
+          }
+          const cycleIndex = (i - cycleStart) % cycleLen;
+          return ops[cycleStart + cycleIndex];
         }
 
         for (let i = 0; i < m; i++) {
-          const linearIdx = r * m + i;
-          const op = getOpFor(r, i, linearIdx);
+          const op = getOpFor(i);
           const shift = op.shift || 0;
           const shiftMod = ((shift % m) + m) % m;
           const swapPos = (i + shiftMod) % m;
@@ -879,8 +965,18 @@
         const finiteLen = baseLen * rounds;
         function getOpFor(rnd, i, linearIdx) {
           if (!parsed.extender) return ops[i % ops.length];
-          if (linearIdx < finiteLen) return ops[linearIdx % baseLen];
-          return ops[baseLen - 1];
+          const cycleStart = Number.isInteger(parsed.extenderCycleStart) ? parsed.extenderCycleStart : baseLen - 1;
+          const cycleLen = Number.isInteger(parsed.extenderCycleLen) && parsed.extenderCycleLen > 0 ? parsed.extenderCycleLen : 1;
+          if (cycleLen <= 0) {
+            return ops[cycleStart] || ops[baseLen - 1];
+          }
+          if (linearIdx < finiteLen && linearIdx < cycleStart) return ops[linearIdx % baseLen];
+          if (linearIdx < finiteLen) {
+            const cycleIndex = (linearIdx - cycleStart) % cycleLen;
+            return ops[cycleStart + cycleIndex];
+          }
+          const cycleIndex = (linearIdx - cycleStart) % cycleLen;
+          return ops[cycleStart + cycleIndex];
         }
 
         for (let i = m - 1; i >= 0; i--) {
@@ -995,7 +1091,7 @@
       reverseWizard: { name: "Reverse Wizard", desc: "Resolved a reverse search!", unlocked: false },
       totalChaos: {name: "Total Chaos", desc: "Encrypted a key with 100% Entropy!", unlocked: false },
       doomedSociety: {name: "Doomed Society",desc: "Total brainrot.", unlocked: false},
-      touchSomeGrass: {name: "Touch Some Grass", desc: "Clicked Encrypt 100 times!", unlocked: false},
+      touchSomeGrass: {name: "Touch Some Grass", desc: "Encrypted 100 times!", unlocked: false},
       devMode: {name: "Developer Mode", desc: "Opened the secret developer screen!", unlocked: false}
     };
 
@@ -1351,7 +1447,7 @@
       const chaosPotential = aura >= 100 ? 'Maximum' : aura >= 70 ? 'High' : aura >= 35 ? 'Medium' : 'Low';
       const stats = [
         ['Cipher Aura', `${aura}%`],
-        ['Banana Index', bananaIndex.toFixed(2)],
+        ['Banana Index', `${bananaIndex.toFixed(2)} 🍌`],
         ['Key Weirdness', weirdness],
         ['Chaos Potential', chaosPotential],
         ['Rounds', String(Math.max(1, parsed.repeat || 1))],
