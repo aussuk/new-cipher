@@ -151,7 +151,7 @@ Apply to the characters in positions from 2 up to 7
 ?i(>=6)
 ```
 
-Apply to characters in positions with an index greater than or equal to 6 (can support >, <, >= and <=)
+Apply to the characters in positions with an index greater than or equal to 6 (can support >, <, >= and <=)
 
 ```text
 ?ie
@@ -169,7 +169,7 @@ Apply to the characters in positions of an odd number
 ?i(%3)
 ```
 
-Apply to the characters in positions in jumps of 3
+Apply to the characters in positions divisible by 3 (in jumps of 3)
 
 ---
 
