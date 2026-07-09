@@ -170,6 +170,22 @@ Apply to the characters in positions of an odd number
 ```
 
 Apply to the characters in positions divisible by 3 (in jumps of 3)
+ 
+By stacking conditionals you can also make an AND operator like this:
+
+```text
+?v?i(>=10)
+
+If character is a vowel AND its index is greater or equal to 10
+```
+
+And also an OR operator by using `|`:
+
+```text
+?v|?i(>=10)
+
+If character is a vowel OR its index is greater or equal to 10
+```
 
 ---
 
