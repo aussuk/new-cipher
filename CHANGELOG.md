@@ -1,5 +1,5 @@
 # Changelog
-## v1.10:
+## v1.10 (probably last major version):
 - Made the saving system work (just needed to remove one line :P);
 - Fixed a bug which prevented index conditionals from working correctly;
 - Added achievements for using certain features and finding the secret mini-game, with a toast notification system to celebrate unlocks;
