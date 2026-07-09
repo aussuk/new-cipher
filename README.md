@@ -334,6 +334,9 @@ Current version:
 v1.10
 ```
 
+This is probably the last major version I am gonna have here but i'll still add small features, more achievements, and fix bugs.
+It was fun while it lasted and I still hope it continues like that!
+
 ---
 
 Created this cipher in Biology class while I wasn't paying attention... hope this inspires you not to pay attention in class!
