@@ -525,7 +525,7 @@
     function formatPrimitiveValue(value) {
       const num = Number(value);
       if (!Number.isFinite(num)) return '';
-      if (num >= 1 && num <= 9) return String(num);
+      if (num >= 0 && num <= 9) return String(num);
       return `(${num})`;
     }
 
@@ -551,7 +551,7 @@
       const next = text[startIndex + 1] || '';
       if (next === '=') {
         let j = startIndex + 2;
-        while (j < text.length && /[A-Za-z\-,\[\]]/.test(text[j])) j++;
+        while (j < text.length && /[A-Za-z\-,]/.test(text[j])) j++;
         return { token: text.slice(startIndex, j), nextIndex: j - 1 };
       }
       if (next === '(') {
@@ -588,6 +588,9 @@
         j += 1;
       }
       if (j >= text.length || !/\d/.test(text[j])) return null;
+      if (!sign) {
+        return { value: Number(text[j]), endIndex: j };
+      }
       while (j < text.length && /\d/.test(text[j])) j += 1;
       return { value: Number(sign + text.slice(startIndex + sign.length, j)), endIndex: j - 1 };
     }
@@ -601,7 +604,7 @@
       const keyWorking = raw.replace(/[_:¶]/g, '').replace(/#\d+/g, '').replace(/-$/, '');
       const parts = [];
       let pendingCond = '';
-      let lastExtenderPattern = '';
+      let extenderRepeatPattern = '';
 
       function appendToken(token, cond = '') {
         if (!token) return;
@@ -612,7 +615,8 @@
         } else {
           parts.push(token);
         }
-        lastExtenderPattern = emitted;
+        extenderRepeatPattern = emitted;
+        pendingCond = '';
       }
 
       function emitExpandedGroup(body, condPrefix = '') {
@@ -651,7 +655,7 @@
             const body = keyWorking.slice(i + 1, end);
             const expanded = emitExpandedGroup(body, pendingCond);
             expanded.forEach(token => parts.push(token));
-            lastExtenderPattern = expanded.join('');
+            extenderRepeatPattern = expanded.join('');
             pendingCond = '';
             i = end;
             continue;
@@ -667,6 +671,14 @@
               i = end;
               continue;
             }
+            if (inner.includes(',')) {
+              const expanded = emitExpandedGroup(inner, pendingCond);
+              expanded.forEach(token => appendToken(token, ''));
+              extenderRepeatPattern = expanded[expanded.length - 1] || extenderRepeatPattern;
+              pendingCond = '';
+              i = end;
+              continue;
+            }
           }
         }
 
@@ -677,7 +689,7 @@
       }
 
       const compiledRaw = parts.join('');
-      const compacted = compactCompiledKey(compiledRaw, { hasExtender, extenderRepeatPattern: lastExtenderPattern });
+      const compacted = compactCompiledKey(compiledRaw, { hasExtender, extenderRepeatPattern });
       const compiledWithFlags = compacted + flagsSuffix;
       const length = hasExtender ? '∞' : compiledWithFlags.length;
       return { compiledKey: compiledWithFlags, length, expandedKey: compiledRaw + flagsSuffix };
@@ -707,7 +719,7 @@
       if (hasExtender) {
         const repeatTail = extenderRepeatPattern || getExtenderRepeatPattern(compiledKey);
         if (repeatTail) {
-          return `${compiledKey}${repeatTail.repeat(8)}…`;
+          return `${compiledKey}${repeatToLength(repeatTail, 10)}...`;
         }
       }
       let output = compiledKey;
@@ -716,6 +728,15 @@
         output = `${repeatPattern.pattern}${repeatPattern.repeat > 1 ? '…' : ''}`;
       }
       return output;
+    }
+
+    function repeatToLength(pattern, length) {
+      if (!pattern || length <= 0) return '';
+      let output = '';
+      while (output.length < length) {
+        output += pattern;
+      }
+      return output.slice(0, length);
     }
 
     function getExtenderRepeatPattern(compiledKey) {
@@ -911,7 +932,7 @@
           if (next === '=') {
             i += 2;
             let list = '';
-            while (i < key.length && /[A-Za-z\-,\[\]]/.test(key[i])) { list += key[i++]; }
+            while (i < key.length && /[A-Za-z\-,]/.test(key[i])) { list += key[i++]; }
             i--;
             const items = list.split(',').map(s => s.trim()).filter(Boolean);
             const letters = new Set();
@@ -1050,8 +1071,14 @@
             parsedGroup.values.forEach(val => pushShift(val, conds));
             const cycleStart = ops.length - parsedGroup.values.length;
             const cycleLen = parsedGroup.values.length;
-            rememberLastGroup(cycleStart, cycleLen);
-            if (maybeAttachExtender(i + 1 + (parsedGroup.nextIndex - i), cycleStart, cycleLen)) {
+            if (ch === '[') {
+              rememberLastGroup(cycleStart, cycleLen);
+            } else {
+              rememberLastGroup(ops.length - 1, 1);
+            }
+            const repeatStart = ch === '[' ? cycleStart : ops.length - 1;
+            const repeatLen = ch === '[' ? cycleLen : 1;
+            if (maybeAttachExtender(i + 1 + (parsedGroup.nextIndex - i), repeatStart, repeatLen)) {
               i = parsedGroup.nextIndex + 1;
             } else {
               i = parsedGroup.nextIndex;
@@ -1709,6 +1736,14 @@
       return out.replace(/^(Encrypted|Decrypted)(?:\s*\([^)]*\))?:\s*/, '');
     }
 
+    function getCopyableOutputText() {
+      const outEl = document.getElementById('output');
+      const out = outEl ? (outEl.textContent || '') : '';
+      const compiledMatch = out.match(/^Compiled Key:\s*([\s\S]*?)\s+-\s+length\s+.+$/);
+      if (compiledMatch) return compiledMatch[1];
+      return out.replace(/^(Encrypted|Decrypted)(?:\s*\([^)]*\))?:\s*/, '');
+    }
+
     function updateStatsPanel(stats) {
       const panel = document.getElementById('statsPanel');
       if (!panel) return;
@@ -1729,7 +1764,60 @@
       const result = compileKeyToPrimitive(rawKey);
       const compileOutput = document.getElementById('compileOutput');
       if (compileOutput) {
-        compileOutput.style.display = 'block';
+        compileOutput.style.display = 'none';
+        compileOutput.textContent = '';
+      }
+      const outputEl = document.getElementById('output');
+      if (outputEl) {
+        outputEl.textContent = result.compiledKey
+          ? `Compiled Key: ${result.compiledKey} - length ${result.length}`
+          : 'Compiled Key: (empty) - length 0';
+      }
+      return result;
+    }
+
+    function updateMetrics() {
+      const word = document.getElementById('wordInput').value || '';
+      const key = document.getElementById('keyInput').value || '';
+      const outputText = getOutputText();
+      const parsed = parseKeyDetailed(key);
+      const movable = getMovableIndices(word, parsed.flags);
+      const total = word.length;
+      const movableCount = movable.length;
+      let changedCount = 0;
+      for (const idx of movable) {
+        if (outputText[idx] !== word[idx]) changedCount += 1;
+      }
+      const unchangedCount = movableCount - changedCount;
+      const rounds = Math.max(1, parsed.repeat || 1);
+      const keyOps = parsed.ops || [];
+      const avgShift = keyOps.length
+        ? (keyOps.reduce((sum, op) => sum + (Number(op.shift) || 0), 0) / keyOps.length).toFixed(2)
+        : '0.00';
+      const percent = movableCount > 0 && outputText ? Math.round((changedCount / movableCount) * 100) : 0;
+      const rating = percent < 30 ? 'Low' : percent < 70 ? 'Medium' : 'High';
+      const entropyLabel = movableCount > 0
+        ? (outputText ? `${percent}% (${rating})` : '0% (None)')
+        : 'N/A';
+
+      const metrics = {
+        movableCount,
+        changedCount,
+        unchangedCount,
+        avgShift,
+        rounds,
+        entropyLabel
+      };
+
+      updateStatsPanel(metrics);
+      if (settings.enableStatsPanel) {
+        updateDeveloperStats();
+      }
+      return metrics;
+    }
+
+    function updateMetricsOldDisabled() {
+      /*
         const lengthText = result.length === '∞' ? 'length ∞' : `length ${result.length}`;
         compileOutput.textContent = result.compiledKey
           ? `${result.compiledKey}  ·  ${lengthText}`
@@ -1776,6 +1864,9 @@
         updateDeveloperStats();
       }
       return metrics;
+    }
+
+      */
     }
 
     function handleLiveInputUpdate() {
@@ -2133,38 +2224,34 @@
           return String(Math.floor(Math.random() * 10));
         }
         if (roll < 0.48) {
-          const sign = Math.random() < 0.35 ? '-' : '';
           const value = String(Math.floor(Math.random() * 90) + 10);
-          return sign + value;
+          return value;
         }
         if (roll < 0.64) {
-          const sign = Math.random() < 0.4 ? '-' : '';
           const value = String(Math.floor(Math.random() * 90) + 10);
-          return '(' + sign + value + ')';
-        }
-        if (withGroup && roll < 0.82) {
-          const count = Math.floor(Math.random() * 3) + 2;
-          const items = [];
-          for (let i = 0; i < count; i++) {
-            const itemRoll = Math.random();
-            if (itemRoll < 0.3) {
-              items.push(String(Math.floor(Math.random() * 10)));
-            } else if (itemRoll < 0.6) {
-              items.push(String(Math.floor(Math.random() * 90) + 10));
-            } else if (itemRoll < 0.9) {
-              items.push('-' + String(Math.floor(Math.random() * 90) + 10));
-            } else {
-              items.push(String.fromCharCode(65 + Math.floor(Math.random() * 26)));
-            }
-          }
-          return '[' + items.join(',') + ']';
+          return '(' + value + ')';
         }
         return String(Math.floor(Math.random() * 90) + 10);
       }
 
+      function randomGroupToken() {
+        const count = Math.floor(Math.random() * 3) + 2;
+        const items = [];
+        for (let i = 0; i < count; i++) {
+          const itemRoll = Math.random();
+          if (itemRoll < 0.3) {
+            items.push(String(Math.floor(Math.random() * 10)));
+          } else if (itemRoll < 0.8) {
+            items.push(String(Math.floor(Math.random() * 90) + 10));
+          } else {
+            items.push(String.fromCharCode(65 + Math.floor(Math.random() * 26)));
+          }
+        }
+        return '[' + items.join(',') + ']';
+      }
+
       for (let i = 0; i < len; i++) {
-        const allowGroup = i > 0 && (Math.random() < 0.25 || parts[parts.length - 1].startsWith('?') || parts[parts.length - 1].startsWith('!'));
-        parts.push(randomShiftToken(allowGroup));
+        parts.push(randomShiftToken(false));
       }
 
       // helper to build a conditional token
@@ -2186,13 +2273,13 @@
           }
           return prefix + '=' + Array.from(chosen).map(c => c.toLowerCase()).join(',');
         } else {
-          // range like a-b
-          const a = Math.floor(Math.random() * 26);
-          const b = Math.floor(Math.random() * 26);
-          const [lo, hi] = a <= b ? [a, b] : [b, a];
-          const ra = String.fromCharCode(97 + lo);
-          const rb = String.fromCharCode(97 + hi);
-          return prefix + '=' + ra + '-' + rb;
+          const count = Math.floor(Math.random() * 3) + 2;
+          const chosen = new Set();
+          while (chosen.size < count) {
+            const ch = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+            chosen.add(ch);
+          }
+          return prefix + '=' + Array.from(chosen).map(c => c.toLowerCase()).join(',');
         }
       }
 
@@ -2218,9 +2305,21 @@
         parts.splice(pos, 0, token);
       }
 
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (isConditionalToken(parts[i]) && !isConditionalToken(parts[i + 1]) && Math.random() < 0.35) {
+          parts[i + 1] = randomGroupToken();
+          i++;
+        }
+      }
+
+      if (!parts.some(part => /^\[/.test(part)) && Math.random() < 0.18) {
+        parts.push(randomGroupToken());
+        parts.push('-');
+      }
+
       let k = parts.join('');
       const hasGroup = /\[[^\]]+\]/.test(k);
-      if (hasGroup && Math.random() < 0.35) {
+      if (hasGroup && /\[[^\]]+\]$/.test(k) && Math.random() < 0.35) {
         k = k + '-';
       } else if (!hasGroup && Math.random() < 0.25) {
         const value = String(Math.floor(Math.random() * 90) + 10);
@@ -2250,8 +2349,7 @@
 
     // Copy output (copies only the transformed text, without "Encrypted:"/ "Decrypted:")
     async function copyOutput() {
-      const out = document.getElementById('output').textContent || '';
-      const text = out.replace(/^(Encrypted:|Decrypted:)\s*/, '');
+      const text = getCopyableOutputText();
       if (!text) return;
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -2276,10 +2374,7 @@
     document.getElementById('copyBtn').addEventListener('click', copyOutput);
     document.getElementById('compileBtn').addEventListener('click', () => {
       const key = document.getElementById('keyInput').value;
-      const result = showCompiledKeyResult(key);
-      if (result.compiledKey) {
-        document.getElementById('output').textContent = '';
-      }
+      showCompiledKeyResult(key);
     });
     
     // Listeners that update settings and save when user changes them
