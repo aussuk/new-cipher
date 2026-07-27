@@ -1546,6 +1546,33 @@
         return true;
       }
 
+      if (command === '/preset' && subcommand === 'save') {
+          if (parts.length < 4) {
+              document.getElementById('output').textContent =
+                  'Usage: /preset save <presetname> <key>';
+              return true;
+          }
+      
+          const name = normalizePresetName(parts[2]);
+          const key = parts.slice(3).join(' ').trim();
+      
+          if (!name || !key) {
+              document.getElementById('output').textContent =
+                  'Usage: /preset save <presetname> <key>';
+              return true;
+          }
+      
+          map[name] = key;
+          savePresetMap(map);
+          unlockAchievement('presetPioneer');
+      
+          document.getElementById('keyInput').value = '';
+          document.getElementById('output').textContent =
+              `Preset saved as @${name}`;
+      
+          return true;
+      }
+      
       if (command === '/preset' && subcommand === 'load') {
         const name = normalizePresetName(parts[2]);
         if (!name) {
@@ -1563,12 +1590,13 @@
       }
 
       if (command === '/preset' && subcommand === 'delete') {
-        const deleteParts = text.split(/\s+/);
-        if (deleteParts.length < 3 || deleteParts[1].toLowerCase() !== 'preset') {
-          document.getElementById('output').textContent = 'Usage: /preset delete <presetname>';
-          return true;
-        }
-        const name = normalizePresetName(deleteParts[2]);
+          if (parts.length < 3) {
+              document.getElementById('output').textContent =
+                  'Usage: /preset delete <presetname>';
+              return true;
+          }
+      
+          const name = normalizePresetName(parts[2]);
         if (!name) {
           document.getElementById('output').textContent = 'Usage: /preset delete <presetname>';
           return true;
