@@ -1527,13 +1527,18 @@
       const command = parts[0].toLowerCase();
       const arg = parts.slice(1).join(' ').trim();
       const map = getPresetMap();
+      const subcommand = (parts[1] || '').toLowerCase();
 
       if (command === '/help' || command === '/commands') {
-        document.getElementById('output').textContent = 'Commands: /save presetname key; /load presetname; /delete preset presetname; /list';
+        document.getElementById('output').textContent = `Commands:
+        /preset save <presetname> <key>
+        /preset load <presetname>
+        /preset delete <presetname>
+        /preset list`;
         return true;
       }
 
-      if (command === '/list') {
+      if (command === '/preset' && subcommand === 'list') {
         const names = Object.keys(map).sort();
         document.getElementById('output').textContent = names.length
           ? `Presets: ${names.map(n => '@' + n).join(', ')}`
@@ -1541,30 +1546,10 @@
         return true;
       }
 
-      if (command === '/save') {
-        const parts = text.split(/\s+/);
-        if (parts.length < 3) {
-          document.getElementById('output').textContent = 'Usage: /save presetname key';
-          return true;
-        }
-        const name = normalizePresetName(parts[1]);
-        const key = parts.slice(2).join(' ').trim();
-        if (!name || !key) {
-          document.getElementById('output').textContent = 'Usage: /save presetname key';
-          return true;
-        }
-        map[name] = key;
-        savePresetMap(map);
-        unlockAchievement('presetPioneer');
-        document.getElementById('keyInput').value = '';
-        document.getElementById('output').textContent = `Preset saved as @${name}`;
-        return true;
-      }
-
-      if (command === '/load' || command === '/use') {
-        const name = normalizePresetName(arg);
+      if (command === '/preset' && subcommand === 'load') {
+        const name = normalizePresetName(parts[2]);
         if (!name) {
-          document.getElementById('output').textContent = 'Usage: /load presetname';
+          document.getElementById('output').textContent = 'Usage: /preset load <presetname>';
           return true;
         }
         const presetValue = loadPresetByName(name);
@@ -1577,15 +1562,15 @@
         return true;
       }
 
-      if (command === '/delete' || command === '/remove') {
+      if (command === '/preset' && subcommand === 'delete') {
         const deleteParts = text.split(/\s+/);
         if (deleteParts.length < 3 || deleteParts[1].toLowerCase() !== 'preset') {
-          document.getElementById('output').textContent = 'Usage: /delete preset presetname';
+          document.getElementById('output').textContent = 'Usage: /preset delete <presetname>';
           return true;
         }
         const name = normalizePresetName(deleteParts[2]);
         if (!name) {
-          document.getElementById('output').textContent = 'Usage: /delete preset presetname';
+          document.getElementById('output').textContent = 'Usage: /preset delete <presetname>';
           return true;
         }
         if (!Object.prototype.hasOwnProperty.call(map, name) || map[name] === undefined || map[name] === null) {
