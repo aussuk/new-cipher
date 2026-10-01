@@ -248,6 +248,47 @@ This example expands the key to 'AB3333333...'
 
 ---
 
+## Example Key
+
+Let's see if you understood it well.
+I'll give a key with a bit of everything here and I'll divide it into parts for an easier explanation. Try to guess how each chunk works and then see what you got right... or wrong.
+
+```text
+Hn6?c1(3,b)!i(<7)[(-8),2]-:
+```
+
+Got it?
+
+Before I start explaining I'll say that you can also use the `compile` button to compile the key, making it longer but making every aprt more barebones, and it still works the same way.
+
+When I don't specify the direction of the shift that means it's to the right.
+
+`H` → Shift 7
+
+`n` → Shift 14
+
+`6` → Shift 6
+
+`?c1` → IF the current character is a consonant, shift 1
+
+`(3,b)` → These are two different parts: Shift 3 and for the next character is shift 2 so you can see it as `(3,` and `b`
+
+...Now it's the brain itcher!
+
+`!i(<7)[(-8),2]` → UNLESS the index of the current character is less than seven, shift 8 **to the left** and for the next character, UNLESS the index is less than 7, shift 2
+
+`-` → this extender repeats the last chunk `!i(<7)[(-8),2]` indefinitely, so the end of the key turns out to be `!i(<7)[(-8),2]!i(<7)[(-8),2]!i(<7)[(-8),2]...` for infinity.
+
+I will also paste the result when you pass this key through the compiled, which makes it easier to synthesize:
+
+(Actually, the compiler isn't working at the moment so I'll do it manually)
+
+```text
+8(14)6?c132!i(<7)(-8)!i(<7)2!i(<7)(-8)!i(<7)2!i(<7)(-8)!i(<7)2...:
+```
+
+---
+
 ## Presets
 
 Presets can be used to save and load specific keys to the device.
