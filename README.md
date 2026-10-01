@@ -60,9 +60,9 @@ Surrounding a number with brackets allows for the possibility for shifts bigger 
 These multi-digit/negative numbers can also be all on the same pair of brackets, separating them using commas, which uses up less characters.
 
 ```text
-(63,-2,900) -- 11 characters
+(63,-2,900)   → 11 characters
 
-(63)(-2)(900) -- 13 characters
+(63)(-2)(900) → 13 characters
 ```
 
 ### Flags
@@ -223,6 +223,7 @@ That expands to:
 ### Rounds
 
 Using rounds you can run the encryption process multiple times. Set the number of repetitions after the #.
+It takes the output and passes it back as the input a set amount of times, defined by the number after the `#`
 Repeat the encryption multiple times:
 
 ```text
@@ -259,7 +260,7 @@ How to save presets:
 
 OR
 
-- Type the command '/save [presetname] [key]' in the key box
+- Type the command `/save <presetname> <key>` in the key box
 
 How to load presets:
 
@@ -268,7 +269,7 @@ How to load presets:
 
 OR
 
-- Type the command '/load [presetname]' in the key box
+- Type the command `/load <presetname>` in the key box
 
 OR
 
@@ -307,7 +308,7 @@ On desktop press the arrow keys in this sequence:
 ↑ ↑ ↓ ↓ ← → ← →
 ```
 
-On mobile enter this:
+But uf you're on mobile enter this:
 
 ```text
 ↑↑↓↓←→←→
@@ -326,8 +327,6 @@ git clone https://github.com/aussuk/new-cipher.git
 ```
 
 Open `index.html` in your browser.
-
-No dependencies required.
 
 ---
 
@@ -355,7 +354,7 @@ It was fun while it lasted and I still hope it continues like that!
 
 ---
 
-Created this cipher in Biology class while I wasn't paying attention... hope this inspires you not to pay attention in class!
+Created this cipher in Biology class while I wasn't paying attention... hope this inspires you not to pay attention in class! (...jk)
 
 I don't have a name for it so if you have a suggestion please notify me.
 
