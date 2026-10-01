@@ -259,7 +259,7 @@ Hn6?c1(3,b)!i(<7)[(-8),2]-:
 
 Got it?
 
-Before I start explaining I'll say that you can also use the `compile` button to compile the key, making it longer but making every aprt more barebones, and it still works the same way.
+Before I start explaining I'll say that you can also use the `compile` button to compile the key, making it longer but making every part more barebones, and it still works the same way.
 
 When I don't specify the direction of the shift that means it's to the right.
 
@@ -349,7 +349,7 @@ On desktop press the arrow keys in this sequence:
 ↑ ↑ ↓ ↓ ← → ← →
 ```
 
-But uf you're on mobile enter this:
+But if you're on mobile enter this:
 
 ```text
 ↑↑↓↓←→←→
